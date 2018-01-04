@@ -1,0 +1,141 @@
+can4linux 3.6.1	     (for kernel 2.6)
+can4linux 4.x.x	     (for kernel 3.x)
+
+MODULE_LICENSE("GPL");
+
+
+read INSTALL*pdf 
+select your hardware in the makefile and call make
+$make TARGET=CPC_PCI
+
+see also src/Readme
+and man/html/index.html
+
+
+Compile the driver for 2.4 Kernels
+$ make -f Makefile-k2.4 TARGET=CPC_PCI
+
+
+
+
+
+Memory mapped I/O
+===================================================
+If a CAN Board uses memory mapped I/O on ISA,
+be sure that the in the PC BIOS access to that memory area is enabled.
+You can for example use Alessandro Rubini's
+silly device driver to read out the ISA IO memory area to scan for
+a SJA100.
+
+$ cat /dev/sillyb | od --address-radix=x -t x1| less
+
+after an hardware reset (power on)
+you should find the following pattern:
+
+038000 21 ff 0c e0 00 00 00 00 00 60 ff ff ff ff ff ff
+038010 ff ff ff ff fd fb df ff 0b 00 08 31 ff ff ff 00
+
+(Adress is starting with 0 == 0x0a0000)
+The example above shows the result with a STZP/IXXAT PCI-03 board
+jumpered for 0xd800 with an sja1000 as CAN0.
+Especially "0c 0e" is the reset value for registers 2(status)
+and 3(interrupt).
+
+use 
+$ cat /dev/sillyb \
+| od --address-radix=x --skip-bytes 0x38000 --read-bytes=0x20 -t x1| less
+
+to see oly the 32 bytes at address 0xd8000.
+
+Example Sources at: 
+http://www.cs.fsu.edu/~baker/devices/lxr/http/source/ldd-examples/misc-modules
+
+
+PCI boards
+use /sbin/lspci to get the slot number of the board of interest
+and than call 
+$ sudo /sbin/lspci  -nn -s 01:05.0 -vvv -x 
+to get as much information as needed.
+
+Another way:
+/usr/sbin/hwinfo --pci
+
+
+
+
+
+
+What if something goes wrong?
+================================================
+
+
+set the environment for compiling the kernel, CC, ARCH, 
+
+
+----------------------------------------------------------------------
+    ERROR: Kernel configuration is invalid.
+	     include/linux/autoconf.h or include/config/auto.conf are missing.
+	     Run 'make oldconfig && make prepare' on kernel src to fix it.
+
+$ make oldconfig && make prepare
+
+----------------------------------------------------------------------
+
+    Building modules, stage 2.
+      MODPOST 1 modules
+    /bin/sh: scripts/mod/modpost: Datei oder Verzeichnis nicht gefunden
+    make[2]: *** [__modpost] Fehler 127
+    make[1]: *** [modules] Fehler 2
+    make[1]: Leaving directory `/home/linux-2.6.31.14'
+    make: *** [all] Fehler 2
+
+
+$ make modules prepare
+----------------------------------------------------------------------
+
+The kernel environment has to be available, that is header files and more
+For native compilation of the driver on Debian based Ubuntu do
+sudo apt-get install linux-headers-$(uname -r)
+
+
+
+Changes on the code regarding changes in Kernal API
+===================================================
+25.07.13 oe: 
+The flag IRQF_SAMPLE_RANDOM, which
+drivers use to tell the kernel whether to use interrupts from their
+device(s) as a source of entropy for the entropy pool that backs the
+kernel's RNG or not, is liable to become redundant from 3.6 onwards.
+"After this change, adding randomness from interrupts ... is done by
+default for all interrupts".
+
+See: http://lwn.net/Articles/507115/
+
+
+
+
+ToDO
+=====
+remove hardware and board specific code from core.c
+It all should be in hardware files like zedboard.c or ems_pci.c.
+Because still the memory for all date should be allocated at link time
+and not dynamically, the compilation is done with defining
+#define MAX_CHANNELS n
+Therefore it will be possible to support only one CAN controller eg.
+on a 4 channel PCI board, or a $ CAN channel SoC.
+
+The basic loop in can_init() therefore
+
+    for (i = 0; i < MAX_CHANNELS; i++) {
+	    /* set basic parameters independent of hardware like */
+	    Baud[i] = 125;
+	    /* call hw functions */
+	    init_hw();
+    }
+
+where init_hw() is in a hardware module selected at compile/link time.
+
+
+
+
+

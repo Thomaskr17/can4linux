@@ -1,0 +1,18 @@
+Content:
+
+
+===========================
+Can.o 
+===========================
+
+
+Don't forget to strip off debug sybols from the driver object code
+
+m68k-elf-strip -d Can.o
+
+
+Please use the Makefile-uCk2.4 for building the ColdFire 5282 FlexCAN
+(by renaming it to Makefile)
+
+Check if the can4linux subdirectory is added to the linux/drivers/char
+directory Makefile

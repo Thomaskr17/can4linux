@@ -1,0 +1,319 @@
+#
+# $Id: Readme,v 1.8 2008/11/23 12:06:37 oe Exp $
+#
+
+
+Where does it came from?
+=======================
+This driver is derived from the LLP projects can4linux driver
+which was started by Clausi Schröter and later maintained by Heinz-Jürgen Oertel
+
+the most of the ddl stuff is removed
+as is the support for supporting different chip-sets and i/o models.
+some useful macros are anyway used in this version
+like the Debug functions ( DBGin();DBGout();)
+or function parameters which do differ in different Linux kernel versions.
+
+Where is the documentation?
+===========================
+man/ - sub directory
+
+Are examples available?
+=======================
+Look in your can4linux distribution for the can4linux-examples
+directory.
+It is not possible to use the driver and application programs (from
+the can4linux-examples directory) compiled for different CPUs,
+e.g for 32 bit and 64 bit CPUs.
+Please compile your application and driver for always for the same CPU
+e.g all for x86_64. 
+Select the correct cross compiler and library locations if you
+are cross compiling for at919263, mcf5282, BlackFin or wahtever.
+Currently you have to change the Make file in can4linux-examples
+
+
+
+
+Adopting other boards, CAN controllers
+======================================
+
+the IO Model - is compiled in (that means it must be selected at compile time)
+
+CAN Chip functions
+are coded in the files <CHIP>funcs.c, e.g. sja1000funcs.c,
+at9263funcs.c
+bf537funcs.c
+i82527funcs.c,
+mcf5282funcs.c
+sja1000func.c,
+mcp2515funs.c
+
+Basic hardware access functions are defined in the chip 
+related c files, like in sja1000funcs.c,
+the register definitions in header files like sja1000.h
+
+all I/O depencies are in the Macros
+    CANout(bd,adr,v)
+    CANin(bd,adr)
+    CANset(bd,adr,m)
+    CANreset(bd,adr,m)
+    CANtest(bd,adr,m)
+defined in can_defs.h
+
+
+
+
+Board specific files, used if the CAN controller,
+e.g. SJA1000 is used on boards made by different manufacturers,
+are named <manuf>_something.c :
+cc_pci.c	- Contemporary Controls PCI board
+cpc_104.c	- EMS Wünsche PC104
+ems_pci.c	- EMS Wünsche PCI board
+kvaser_pci.c	- Kvaser 4 channel CAN PCI
+Please have a look at the Makefile for correct namings.
+
+
+Common files for all drivers, mostly hardware independent
+    open.c
+    read.c
+    write.c
+    ioctl.c
+    select.c
+    debug.c
+    error.c
+    util.c
+    sysctl.c
+    async.c
+    close.c
+    
+
+Let's look at one example, the CPC_PCI board by EMS Wünsche
+The Makefile compiles all common files,
+The board specific one:
+    ems_pci
+and the CAN controller specific:
+    sja1000funcs.c
+
+There is one important header file which nearly all modules include:
+    defs.h
+It includes variable declarations, constant definitions
+and some Target specific stuff embedded in some #if defined(TARGET).
+Looking at the CPC-PCI Target, we find:
+    #elif defined(CPC_PCI) || defined(CPC_PCI2)
+    # define CAN_OUTC_VAL           0xda
+    # define IO_MODEL		'm'
+    # define STD_MASK		0xFFFFFFFF 
+    # include "sja1000.h"
+    # include "ems_pci.h"
+    extern void board_clear_interrupts(int minor);
+
+which includes the CAN header and the board specific header
+for every C-module.
+
+It's a good idea when adding a new hardware to look for example at all
+occurrences of CPC_PCI as a reference and decide if one have to add 
+similar code.
+
+
+
+Does it work with PCI-Express?
+==============================
+We have tested the CPC-PCIe - an PCI Express  board for up to two
+CAN channels based on the CPC-PCI. It works without any software
+changes.  The board has its own PCI-Express to PCI Bridge, thats it.
+Behind this bridge, the standard PCI bus controller as on the
+CPC-PCI is used.
+
+lspci shows
+
+01:00.0 PCI bridge: Texas Instruments XIO2000(A)/XIO2200(A) PCI Express-to-PCI Bridge (rev 03)
+02:00.0 Network controller: Siemens Nixdorf AG Eicon Diva 2.02 compatible passive ISDN card (rev 02)
+
+lspci -v
+
+01:00.0 PCI bridge: Texas Instruments XIO2000(A)/XIO2200(A) PCI Express-to-PCI Bridge (rev 03) (prog-if 00 [Normal decode])
+        Flags: bus master, fast devsel, latency 0
+        Bus: primary=01, secondary=02, subordinate=02, sec-latency=0
+        Memory behind bridge: 90200000-902fffff
+        Capabilities: [50] Power Management version 2
+        Capabilities: [60] Message Signalled Interrupts: Mask- 64bit+ Queue=0/4 Enable-
+        Capabilities: [80] Subsystem: Gammagraphx, Inc. Unknown device 0000
+        Capabilities: [90] Express PCI/PCI-X Bridge IRQ 0
+
+02:00.0 Network controller: Siemens Nixdorf AG Eicon Diva 2.02 compatible passive ISDN card (rev 02)
+        Flags: bus master, medium devsel, latency 0, IRQ 11
+        Memory at 90201000 (32-bit, non-prefetchable) [size=4K]
+        Memory at 90200000 (32-bit, non-prefetchable) [size=4K]
+        Capabilities: [40] Power Management version 2
+
+Unfortunately, the CAN interrupt is shared with some others
+(in our PC used for the test)
+cat /proc/interrupts
+           CPU0
+ 11:      17856          XT-PIC  uhci_hcd:usb4, uhci_hcd:usb5, ohci1394, ehci_hcd:usb8, Can, Can
+
+/var/log/messages
+Jan  8 08:01:36 ursula kernel: PCI-PeliCAN-memory mapped CAN Driver 3.4.6_CPC_PCI (c) Jan  8 2008
+Jan  8 08:01:36 ursula kernel:  H.J. Oertel (oe@port.de)
+Jan  8 08:01:36 ursula kernel:   found CPC-PCI:
+Jan  8 08:01:36 ursula kernel:                : 0000:02:00.0
+Jan  8 08:01:36 ursula kernel:  CAN: 1. at pos 1
+Jan  8 08:01:36 ursula kernel:  CAN: 2. at pos 2
+
+We had problems on another PC. After installing the CPC-PCIe, the
+X server didn't find the additional graphic board. But this seems
+to be a problem of the X-server configuration.
+This is solved (2011).
+
+
+==========================================================================
+
+Version control using svn on SourceForge
+
+$ svn commit -m " commit text"
+to commit local changes
+
+And to make an official release
+
+$ svn copy \
+    https://can4linux.svn.sourceforge.net/svnroot/can4linux/trunk/can4linux
+    https://can4linux.svn.sourceforge.net/svnroot/can4linux/tags/can4linux-3.5.7 \
+    -m "Tagging can4linux release 3.5.7"
+
+The new tagged version exists now at:
+https://can4linux.svn.sourceforge.net/svnroot/can4linux/tags/can4linux-3.5.7/
+
+
+Next steps:
+Login at SourceForge
+Goto Files
+Create new folder
+
+do a cvs co
+svn co https://can4linux.svn.sourceforge.net/svnroot/can4linux/trunk trunk
+create locally the tgz archive can4linux-3.5.7.tgz 
+cd trunk
+tar zcvf can4linux-3.5.7.tgz can4linux can4linux-examples
+download it to the new folder
+
+==========================================================================
+
+
+Reference syslog created from can_send
+loading with insmod 
+
+Jun  9 10:38:43 uschi kernel: PCI-PeliCAN-memory mapped CAN Driver 3.5.2_CPC_PCI (c) Jun  9 2008 10:37:54
+Jun  9 10:38:43 uschi kernel:  H.J. Oertel (oe@port.de)
+Jun  9 10:38:43 uschi kernel:  MAX_CHANNELS 4
+Jun  9 10:38:43 uschi kernel:  CAN_MAX_OPEN 4
+Jun  9 10:38:43 uschi kernel:   found CPC-PCI:
+Jun  9 10:38:43 uschi kernel:                : 0000:00:0c.0
+Jun  9 10:38:43 uschi kernel:  CAN: 1. at pos 1
+Jun  9 10:38:43 uschi kernel:  CAN: 2. at pos 2
+
+
+
+The driver checks at this stage some registers. If the values are as expected, it says "CAN: 1. at pos x".
+Typically that means the base address is correct.
+
+
+
+$ sudo ./debug 7
+/proc/sys/Can/AccCode:-1        -1      -1      -1
+/proc/sys/Can/AccMask:-1        -1      -1      -1
+/proc/sys/Can/Base:-114539520   -114522624      0       0
+/proc/sys/Can/Baud:125  125     125     125
+/proc/sys/Can/Chipset:SJA1000
+/proc/sys/Can/IOModel:mmmm
+/proc/sys/Can/IRQ:209   209     0       0
+/proc/sys/Can/Outc:218  218     218     218
+/proc/sys/Can/Overrun:0 0       0       0
+/proc/sys/Can/RxErr:0   0       0       0
+/proc/sys/Can/Timeout:100       100     100     100
+/proc/sys/Can/TxErr:0   0       0       0
+/proc/sys/Can/dbgMask:7
+/proc/sys/Can/version:3.5.2_CPC_PCI
+
+
+can_send
+Jun  9 10:40:38 uschi kernel: Can: - :in  can_open
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_VendorInit
+Jun  9 10:40:38 uschi kernel: Can: - :in  Can_RequestIrq
+Jun  9 10:40:38 uschi kernel: Can: - :Requested IRQ: 209 @ 0xf929445e
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  Can_TxFifoInit
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  Can_RxFifoInit
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_ChipReset
+Jun  9 10:40:38 uschi kernel: Can: - : INT 0x0
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :status=0x3c mode=0x1
+Jun  9 10:40:38 uschi kernel: Can: - :[1] CAN_mode 0x1
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :[1] CAN_mode 0x9
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :[1] CAN_mode 0x9
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_SetTiming
+Jun  9 10:40:38 uschi kernel: Can: - :baud[1]=125
+Jun  9 10:40:38 uschi kernel: Can: - :tim0=0x3 tim1=0x1c
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :[1] CAN_mode 0x9
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_SetMask
+Jun  9 10:40:38 uschi kernel: Can: - :[1] acc=0xffffffff mask=0xffffffff
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :[1] CAN_mode 0x9
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_StartChip
+Jun  9 10:40:38 uschi kernel: Can: - :[1] CAN_mode 0x9
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :start mode=0x8
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel:  MODE 0x8, STAT 0x3c, IRQE 0xf, INT 0x0
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  can_write
+Jun  9 10:40:38 uschi kernel: Can: - : -- write 1 msg
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_SendMessage
+Jun  9 10:40:38 uschi kernel: Can: - :CAN[1]: tx.flags=0 tx.id=0x64 tx.length=8 stat=0xc
+Jun  9 10:40:38 uschi kernel: Can: - :---> send std message
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  can_read
+Jun  9 10:40:38 uschi kernel: Can: - : => got IRQ[1]: 0x2
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - : => leave IRQ[1]
+Jun  9 10:40:38 uschi kernel:
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  can_close
+Jun  9 10:40:38 uschi kernel: Can: - :in  CAN_StopChip
+Jun  9 10:40:38 uschi kernel: Can: - :out
+Jun  9 10:40:38 uschi kernel: Can: - :in  Can_FreeIrq
+Jun  9 10:40:38 uschi kernel: Can: - :out
+
+
+
+
+Why locking access to the write Queue?
+========================================
+
+Up to version 3.5.7 spinlock is used to protect
+the acess to the write queue if accessed by more than one process
+using can4linux for writing and the CAN interrupt.
+http://www.linuxgrill.com/anonymous/fire/netfilter/kernel-hacking-HOWTO-5.html
+http://de.wikipedia.org/wiki/Spinlock
+
+The used FIFO concept
+=====================
+is a simple one written by the developer(s).
+May be it's time now (2013) to use the kernel kfifo implementation.
+kernel API:
+include/linux/kfifo.h
+Introduction:
+http://thelinuxdesk.com/tag/linux-kernel-queue/
+

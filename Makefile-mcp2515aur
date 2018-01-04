@@ -1,0 +1,90 @@
+# can4linux -- LINUX device driver Makefile
+# Copyright (c) 20011 port GmbH Halle/Saale
+# Used release tag for this software version
+
+VERSION=3
+REL=5.7
+RELEASE=CAN4LINUX-$(VERSION)_$(REL)
+DVERSION=$(VERSION).$(REL)
+
+#
+# The driver major device number
+# The new linux/Documentation/devices.txt defines major=91 for CAN
+# This major number is used für the internl CAN of the AT91SAM9263.
+# The driver for the SPI MCP connected to the SSV ARM Board 
+# is using 92. According to Documentation/devices.txt:
+# 92 char        Reserved for ith Kommunikationstechnik MIC ISDN card
+CAN_MAJOR=	91
+CAN_MODULE = can4linuxspi
+CAN_MODULE = canspi
+TARGET=AuR_MCP2515
+# location of the compiled objects and the final driver module
+OBJDIR = obj
+
+# Debugging Code within the driver
+# to use the Debugging option
+# and the Debugging control via /proc/sys/dev/Can/DbgMask
+# the Makefile in subdir Can must called with the DEBUG set to
+# DEBUG=1
+# else
+# NODEBUG
+# doesn't compile any debug code into the driver
+DEBUG=NODEBUG
+DEBUG=DEBUG=1
+
+# all definitions for compiling the sources
+# CAN_PORT_IO		- use port I/O instead of memory I/O
+# CAN_INDEXED_PORT_IO   - CAN registers adressed by a pair of registers
+#			  one is selcting the register the other one does i/O
+#			  used eg. on Elan CPUs
+# CAN4LINUX_PCI
+# IODEBUG               - all register write accesses are logged
+# CONFIG_TIME_MEASURE=1 - enable Time measurement at parallel port
+#
+# CAN_MAX_OPEN		- the driver can be opened more than once
+#                         the number specifies the number of possible
+#			  different process, the number of RX queues
+#			  the driver has to handle
+#
+
+
+# ATMEL AT91SAM9G45 (MCP1515 @ 12 Mhz)
+DEFS         =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+		-DCAN_SYSCLK=12 -DMAX_CHANNELS=1 \
+		-DCAN_MAX_OPEN=2 \
+		-Wno-undef	\
+EXTRA_CFLAGS =  $(DEFS) -DVERSION=\"$(DVERSION)_$(TARGET)\"
+PWD         :=  $(shell pwd)
+
+obj-m		:= $(CAN_MODULE).o
+# add other object modules here
+$(CAN_MODULE)-objs:=  core.o		\
+	    open.o		\
+	    read.o		\
+	    write.o		\
+	    ioctl.o		\
+	    select.o		\
+	    debug.o		\
+	    util.o		\
+	    sysctl.o		\
+	    async.o		\
+	    close.o		\
+	    mcp2515funcs.o
+
+
+.PHONY: all
+
+all install::
+	@echo "CC = $(CC)"
+	test ! -d $(KDIR) || $(MAKE) -C $(KDIR) M=$(PWD) TARGET=$(TARGET) modules
+
+clean:
+	test ! -d $(KDIR) || $(MAKE) -C $(KDIR) M=$(PWD) TARGET=$(TARGET) clean
+
+#install:
+#	cp can.ko /prj/wolffish/boot/rootfs/home/
+#	-mknod /prj/wolffish/boot/rootfs/dev/can0 c $(CAN_MAJOR) 0
+#	chmod 666 /prj/wolffish/boot/rootfs/dev/can0
+
+inode:
+	@ echo "mknod  /dev/canspi c 92 0"

@@ -1,0 +1,48 @@
+ARCH=arm
+CROSS_COMPILE=arm-linux-uclibc-
+CROSS_TOOL_PATH=/home/oertel/pakete/mmc/port-sdk/build_arm/staging_dir/usr/bin/
+PATH=$PATH:$CROSS_TOOL_PATH
+CC=${CROSS_TOOL_PATH}/arm-linux-uclibc-gcc
+AR=${CROSS_TOOL_PATH}/arm-linux-uclibc-ar
+LD=${CROSS_TOOL_PATH}/arm-linux-uclibc-ld
+RANLIB=${CROSS_TOOL_PATH}/arm-linux-uclibc-ranlib
+DEPMOD=${CROSS_TOOL_PATH}/arm-linux-uclibc-depmod-2.6
+
+[ ${KDIR} ] || KDIR=/home/oertel/pakete/mmc/port-sdk/project_build_arm/ULSP/linux-2.6.25.20
+DEPLOYDIR=
+DESTDIR=$(dirname $(pwd))/install/arm
+LD_LIBRARY_PATH=${DEPLOYDIR}/lib/
+
+LIBS=
+CFLAGS="-Wall -Wstrict-prototypes -Os -Wl,-s"
+LDFLAGS=
+
+export ARCH
+export CROSS_COMPILE
+export CC
+export AR
+export LD
+export RANLIB
+export DEPMOD
+export LIBS
+export CFLAGS
+export LDFLAGS
+export DEPLOYDIR
+export DESTDIR
+export KDIR
+
+echo
+echo "ARCH            " $ARCH
+echo "CROSS_COMPILE   " $CROSS_COMPILE
+echo "CC              " $CC
+echo "AR              " $AR
+echo "LD              " $LD
+echo "RANLIB          " $RANLIB
+echo "DEPMOD          " $DEPMOD
+echo "KDIR            " $KDIR
+echo "LIBS            " $LIBS
+echo "CFLAGS          " $CFLAGS
+echo "LDFLAGS         " $LDFLAGS
+echo "DEPLOYDIR       " $DEPLOYDIR
+echo "DESTDIR         " $DESTDIR
+echo

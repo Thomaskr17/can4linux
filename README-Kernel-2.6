@@ -1,0 +1,23 @@
+can4linux can now be used with kernel 2.6. (and of course 3.x)
+It's not yet integrated into the kernel drivers directory tree and 
+configuration is not yet supported bei the kernel configuration tools
+like menuconfig or xconfig.
+
+just copy the directory elsewhere, edit the Makefile to select your hardware
+and type make. 
+You have to install the driver manually, mostly using 
+# insmod can.ko
+or 
+# make load
+
+Tested at port GmbH are the ISA board AT-CAN-MINI and the PCI CPC-PCI.
+Reported to work:
+IXXAT_PCI03, SBS_PC7, PCM3680
+
+Please provide the device inodes manually if required (not using devfs).
+
+Using the ISA board, addresses and irq must be set manually in /proc/sys/Can.
+(using ./utils/cansetup )
+
+
+

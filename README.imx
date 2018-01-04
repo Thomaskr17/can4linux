@@ -1,0 +1,299 @@
+i.MX25 ARM cpu with FlexCAN
+i.MX28 ARM cpu with FlexCAN
+i.MX35 ARM cpu with FlexCAN
+=====================================
+Some notes for developers
+i.MX25, i.MX28 and i.MX35 share the same code base for the FlexCAN controller.
+Be aware to control the settings in the environment scripts:
+cross-imx25
+cross-imx28
+cross-imx35
+and select the appropriate Makefile
+Makefile-imx25
+Makefile-imx28
+Makefile-imx35
+using the ./target script
+
+as of today, May 02 2013,
+imx25 was tested using both CAN channels on a Ka-Ro TX25 module.
+imx28 was tested using both CAN channels on a Ka-Ro TX28 module.
+imx28 was tested using both CAN channels on a custom board (ecan9)
+And imx35 should still work with one CAN only on the Freescale PDK
+with svn 53
+You are welcome to test the second channel with the latest svn (oe@port.de)
+
+
+
+special files
+
+imx35.c			platform specific code for imx25/28/35 
+imx35flexcan.h		FlexCAN  register definitions
+imx35funcs.c		FlexCAN hardware functions
+imx35.h			platform definitions, e.g. register acess macros
+
+
+Bit timing register values for 
+   presdiv
+   PROPSEG
+   PSEG1
+   PSEG2
+
+are coded in imx35flexcan.h
+for 66.5 Mhz and 24 Mhz
+
+
+clk_get_rate = 24.000.000
+== 24 MHZ
+cat /proc/cpu/clocks 
+....
+can_clk-1          ipg_clk-0          ______    0    66500000 (66MHz)
+can_clk-0          ipg_clk-0          ______    0    66500000 (66MHz)
+...
+ckih-0                                __F___    2    24000000 (24MHz)
+
+
+calculating the values http://www.port.de/pages/misc/bittimings.php?lang=en
+was used.
+
+
+
+FLEX-CAN is already defined in the kernel sources as an
+platform-device.
+mach-mx35/devices.c
+static struct platform_device flexcan_devices[] = {
+    .resource = flexcan1_resources,
+
+static struct resource flexcan1_resources[] = {
+	{
+	 .start = CAN1_BASE_ADDR,
+	 .end = CAN1_BASE_ADDR + 0x97F,
+	 .flags = IORESOURCE_MEM,},
+	{
+	 .start = MXC_INT_CAN1,
+	 .end = MXC_INT_CAN1,
+	 .flags = IORESOURCE_IRQ,}
+};
+
+demnach ist auch schon Speicher reserviert
+cat /proc/iomem:
+    53fe4000-53fe497f : FlexCAN.0
+    53fe8000-53fe897f : FlexCAN.1
+
+
+
+arch/arm/mach-mx25/board-mx25_3stack.h
+defines further some details for the FlexCAN module
+
+struct flexcan_platform_data flexcan_data[] = {
+	{
+	 .core_reg = "GPO2",
+	 .io_reg = NULL,
+	 .xcvr_enable = flexcan_xcvr_enable,
+	 .active = gpio_can_active,
+	 .inactive = gpio_can_inactive,},
+	{
+	 .core_reg = "GPO2",
+	 .io_reg = NULL,
+	 .xcvr_enable = flexcan_xcvr_enable,
+	 .active = gpio_can_active,
+	 .inactive = gpio_can_inactive,},
+};
+
+The most important thing is,
+that a clock source must be enabled and assigned to the CAN
+in order to get access to it.
+This is done by:
+
+    struct clk *clk;
+    clk = clk_get(&pdev->dev, "can_clk");
+    if (IS_ERR(clk)) {
+	   dev_err(&pdev->dev, "no clock defined\n");
+	   err = PTR_ERR(clk);
+	   return err;
+    }
+
+
+The clock source in the FlexCAN is set in imx35funcs.c:CAN_StartChip() 
+    CANoutl(minor, canctrl, 0 + CAN_CTRL_CLK_SRC_BUS);
+or
+    CANoutl(minor, canctrl, 0 );
+if the external clock is used (mor stable)
+
+used register header file is imx35flexcan.h
+it contains also the bit timing values for the bit timing table
+
+
+
+
+Handling Buffer overflow
+For a simple Test a udelay is placed in the ISR.
+Now sending a burst of fast CAN frames, id is counting from 0 to 29
+the receive application shows the following result:
+
+
+194:~# receive -b 500 -H                                                                   
+        8639.728014        0/0x00000000 : bD ( 8): 55 02 03 04 05 06 07 aa                 
+        8639.728014        1/0x00000001 : bD ( 8): 55 02 03 04 05 06 07 aa                 
+        8639.728014        2/0x00000002 : bD ( 8): 55 02 03 04 05 06 07 aa                 
+        8639.728014        3/0x00000003 : bD ( 8): 55 02 03 04 05 06 07 aa                 
+        8639.728014       -1/0xffffffff : bD ( 8): 55 02 03 04 05 06 07 aa Error flags=0x002
+        8639.728014       -1/0xffffffff : bD ( 8): 55 02 03 04 05 06 07 aa Error flags=0x002
+        8639.728014       -1/0xffffffff : bD ( 8): 55 02 03 04 05 06 07 aa Error flags=0x002
+        8639.728014        4/0x00000004 : bD ( 8): 55 02 03 04 05 06 07 aa                  
+        8639.728014        5/0x00000005 : bD ( 8): 55 02 03 04 05 06 07 aa                  
+        8639.728014        6/0x00000006 : bD ( 8): 55 02 03 04 05 06 07 aa                  
+        8639.728014        7/0x00000007 : bD ( 8): 55 02 03 04 05 06 07 aa                  
+        8639.728014        8/0x00000008 : bD ( 8): 55 02 03 04 05 06 07 aa                  
+        8639.728014        9/0x00000009 : bD ( 8): 55 02 03 04 05 06 07 aa           
+which can be explained as follows:
+ the first frames are received, the ISR puts them in the rx queue
+ than The FIFO overflow occurs, which is recognized and the error put in the
+ queue (Flag MSG_OVR == 0x2).
+ At the end, the last 6 Messages still in the RX-FIFO are read
+ and put in the applications rx queue.
+
+
+
+
+Does Errata "e2656: FlexCAN: Abort request blocks the CODE field"
+has any influence on can4linux?
+
+Errata type: Errata
+Description: An Abort request to a transmit Message Buffer (TxMB)
+	     can block any write operation into its CODE
+	     field. Therefore, the TxMB cannot be aborted or
+	     deactivated until it completes a valid transmission
+	     (by winning the CAN bus arbitration and transmitting
+	     the contents of the TxMB).
+Workaround: Instead of aborting the transmission, use deactivation instead.
+             Note that there is a chance the deactivated TxMB
+             can be transmitted without setting IFLAG and updating
+             the CODE field if it is deactivated.
+
+
+e3407: FlexCAN: CAN Transmitter Stall in case of no Remote Frame 
+    in response to Tx packet with RTR=1
+
+
+
+
+Getting the FlexCAN Address and IRQ.
+May be instead of looking for the defines,
+it could be better to use 
+	platform_get_resource()
+	platform_get_irq()
+and fill in flexcan_probe the values for BASE[] and IRQ[]
+
+
+
+
+To handle the CAN controller status with an internal state machine
+the functionality in SocketCAN's functions
+
+    static int flexcan_poll_state(struct net_device *dev, u32 reg_esr)
+    static void do_state(struct net_device *dev,
+			 struct can_frame *cf, enum can_state new_state)
+
+
+should be evaluated and may be used in can4linux
+
+
+
+=============================================================================
+
+
+
+
+can_send -t1 -s 1000
+CPU bleibt stehen
+
+
+
+log
+
+[   71.060000] Can[1]: - : -- write 4 msg, blocking=0
+[   71.070000] Can[1]: - : in  CAN_SendMessage()
+[   71.070000] Can[1]: - :---> send std message 
+[   71.070000] 
+[   71.070000] Can[1]: - : out CAN_SendMessage()
+[   71.080000] Can[1]: - : => got TX IRQ[1]: 0x00010000
+[   71.080000] 
+[   71.080000] Can[1]: - :---> send std message 
+[   71.080000] 
+[   71.080000] Can[1]: - : => leave IRQ[1]
+[   71.080000] 
+[   71.100000] Can[1]: - : => got TX IRQ[1]: 0x00010000
+[   71.100000] 
+[   71.100000] Can[1]: - :---> send std message 
+[   71.100000] 
+[   71.100000] Can[1]: - : => leave IRQ[1]
+[   71.100000] 
+[   71.120000] Can[1]: - : => got TX IRQ[1]: 0x00010000
+[   71.120000] 
+[   71.120000] Can[1]: - :---> send std message 
+[   71.120000] 
+[   71.120000] Can[1]: - : => leave IRQ[1]
+[   71.120000] 
+[   71.140000] Can[1]: - : => got TX IRQ[1]: 0x00010000
+[   71.140000] 
+[   71.140000] Can[1]: - : => leave IRQ[1]
+[   71.140000] 
+[   71.150000] Can[1]: - : out can_write()
+[   72.150000] Can[1]: - : in  can_write()
+[   72.160000] Can[1]: - : -- write 4 msg, blocking=0
+[   72.160000] Can[1]: - : in  CAN_SendMessage()
+
+
+d.h, nach der Pause stoppt die Ausführung in CAN_SendMessage()
+folgen müsste
+[   71.070000] Can[1]: - :---> send std message 
+[   71.070000] 
+[   71.070000] Can[1]: - : out CAN_SendMessage()
+
+
+das gleiche mit can0:
+
+[  123.510000] Can[0]: - : -- write 4 msg, blocking=0
+[  123.520000] Can[0]: - : in  CAN_SendMessage()
+
+
+
+
+
+    mit printk in CAN_Send
+
+Standard can_send
+[16652.910000] can4linux: stat = 0x0080
+[16652.910000] can4linux: ctl_status: 0x0000
+
+
+can_send -Dcan0 -t1
+[16681.330000] can4linux: stat = 0x0080
+[16681.330000] can4linux: ctl_status: 0x0000
+
+can_send -Dcan0 -t2
+[16691.230000] can4linux: stat = 0x0080
+[16691.230000] can4linux: ctl_status: 0x100000
+
+
+can_send -Dcan0 -t3
+[16716.710000] can4linux: stat = 0x0080
+[16716.710000] can4linux: ctl_status: 0x0000
+
+can_send -Dcan0 -t1
+[16773.140000] can4linux: stat = 0x0080
+[16773.140000] can4linux: ctl_status: 0x0000
+
+
+ can_send -Dcan0 -t1
+[16863.500000] can4linux: stat = 0x0080
+[16863.500000] can4linux: ctl_status: 0x100000
+
+
+
+
+
+
+
+
+

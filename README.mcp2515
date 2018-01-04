@@ -1,0 +1,105 @@
+README Microchip MCP2515 port
+
+This can4linux driver version supports the Microchip MCP2515 CAN controller
+vie SPI.
+
+This version is available in two different versions:
+- using the SPI sub layer (/dev/spidevX.Y)
+- using direct register access to the SPI controller
+
+
+
+Comments on the version using the kernels SPI sub layer 
+-------------------------------------------------------------------------
+
+The MCP2515 has to be connected with its interrupt line
+to an interrupt enabled GPIO pin.
+The configuration via /proc/sys/dev/Can/IRQ can be used to set
+the interrupt. The driver than uses the reverse irq_to_gpio(IRQ[minor])
+to initialize the pin (mpc2515funcs.c:Can_RequestIrq()).
+In mcp2515funcs.c:Can_RequestIrq() the board/cpu specific IRQ line flags
+(see include/linux/irq.h) has to be set. May be put it in a later version into
+a board/architecture specific file.
+
+
+performance issues
+ sending one CAN frame results in two CAN controller (GPIO) interrupts
+ and 6 SPI (atmel_spi.0) interrupts
+ receiving one CAN frame results in two CAN controller interrupts
+ and 4 SPI interrupts
+
+
+
+Comments on the version using direct SPI register access
+-------------------------------------------------------------------------
+It was ported to two different hardware platforms
+- AT91SAM9263, using both, the internal CAN and one MCP2515
+- AT91SAM9G45, with one external MCP2515
+
+
+to configure use
+./target mcp2515
+./target mcp2515aur
+
+
+
+
+To access the SPI controller different defines are used:
+- the SPI pins itself:
+	SPI0_MISO
+	SPI0_MOSI
+	SPI0_SPCK
+  if not set in the Linux SPI driver layer (/dev/spidevX.Y, device spi)
+  The can be defined and set to a start level
+  in mcp2515funcs.c:at91_spihw_init()
+
+- The MCP2515 Chip Select and Interrupt line
+  The used Pins are defined in defs.h in the target specific section
+  e.g.:
+
+    #elif defined(AuR_MCP2515)
+    ....
+    #define CAN_SPI_INTERRUPT_PIN	AT91_PIN_PB22
+    #define CAN_SPI_CS0		AT91_PIN_PB3
+    ....
+    #elif
+
+
+Access to the SPI Controller is protected by two macros
+    down()
+	 code
+    up()
+
+down will currently disable hard interrupts on the local CPU using
+local_irq_save()
+
+
+SPI actions for CAN Receive Interrupt:
+ISR
+    mcp251x_read_reg(CANINTF);
+    	at91_spihw_rwn(len = 3);
+    mcp251x_hw_rx(0, &timestamp, &printk_limit);
+	at91_spihw_rwn_CSon(len = 6);
+	at91_spihw_rwn(len = CAN DLC)
+    mcp251x_write_bits(CANINTF, irqstate, 0);
+	at91_spihw_rwn(len = 4);
+
+that means typical in receive 21 byte transfers are done between
+the cpu and CAN using SPI
+(screenshoot tmp/SPI_CAN_Receive_2.jpg) 
+
+
+
+
+CAN Bit Timing Table
+-------------------------------------------------------------------------
+Like with all can4linux versions, a fixed bit timing table is
+used located in mcl2515.h.  The values are depending of the
+oszillator frequency of the crystal connected directly to the CAN
+controller.  Please take care, because of the restrictions of the
+oscillator frequency and one restriction of the CAN controller itself
+"Minimum valid setting for PS2 is 2 TQ"
+See comments in the definition section  #define CAN_BCR[12]...
+With an crystal of 12 MHz it will not be possible to generate bit
+rates higher than 500K
+

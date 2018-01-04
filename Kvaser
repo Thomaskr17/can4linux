@@ -1,0 +1,112 @@
+Kvaser PCIcan-Q 
+PCIcan-Q has four CAN controllers.
+
+PCIcan board uses the S5920 from AMCC as PCI controller.
+The PCI controller is responsible for address decoding and interrupt steering.
+
+The PCI controller
+can decode up to 5 different address areas,
+three of which are used by the PCIcan.
+
+Address area   Type Size (bytes) Used for
+    0          I/O  128          AMCC registers.
+                                 Described in the S5920 manual.
+    1          I/O  128          SJA1000 circuits
+                                 0 - 0x1f: SJA1000 #1
+                                 0x20 - 0x3F: SJA1000 #2
+                                 0x40 - 0x5F: SJA1000 #3
+                                 0x60 - 0x7F: SJA1000 #4
+    2          I/O  8            Xilinx registers
+
+
+Address area number 1,
+the one used for the SJA1000's,
+is further subdivided into four areas
+of 32 bytes each;
+one for each (possible) SJA1000.
+
+The S5920 is operated in pass-thru operation, passive mode.
+To configure the address areas,
+the value 0x80808080
+should be written
+into the PCI PASSTHRU CONFIGURATION REGISTER (PTCR) register.
+This sets all regions to use 0 wait
+states and to use the PTADR signal.
+
+The PCIcan uses one PCI bus interrupt, INTA#.
+It is asserted whenever one
+or more
+SJA1000's
+have their interrupts active.
+To reset an active interrupt,
+read the interrupt status register in all present SJA1000s
+- the interrupt of the corresponding SJA1000 will then
+automatically clear.
+To check the status of the interrupt line,
+test the INTERRUPT ASSERTED bit (number 23)
+in the INTCSR register in the S5920.
+To enable or disable interrupts from the PCIcan,
+use the ADD-ON INTERRUPT PIN ENABLE (bit 13)
+in the INTCSR register in the S5920.
+
+
+
+
+
+
+Xilinx FPGA
+
+The Xilinx FPGA implements a few registers.
+Address offset   Register   Usage
+  0-6                       Reserved, do not use
+  7              VERINT     Bit 7 - 4 contains the revision number of the FPGA
+                            configuration. 15 is the first revision,
+                            14 is the next, and so on.
+
+The current FPGA revision number is 14
+(which is read from the VERINT register as 1110xxxx).
+Future revisions (13, 12, 11, ...) will remain compatible with revision 14.
+
+
+
+PCI Configuration Data
+The following data are configured automatically
+into the S5920 PCI controller
+when power is applied to the card.
+ Item                           Value
+ Vendor Id                      0x10e8
+ Device Id                      0x8406 (for all PCIcan boards)
+ Revision Id                    0
+ Class Code                     0xffff00 (means:
+ 					no base class code defined for device)
+ Subsystem Vendor Id            0
+ Subsystem Device Id            0
+
+Configuration of the SJA1000
+
+Setting the OCR register to 0xDA is a good idea. 
+
+
+References
+AMCC PCI Products Data Book S5920 / S5933 (1998)
+     Also available on the web (www.amcc.com) in the file pciprod.pdf.
+
+
+$ lspci
+0000:00:0c.0 Class ff00: Applied Micro Circuits Corp.: Unknown device 8406
+
+
+0000:00:0c.0 Class ff00: Applied Micro Circuits Corp.: Unknown device 8406
+        Flags: medium devsel, IRQ 10
+        I/O ports at de00 [size=128]
+        I/O ports at dc00 [size=128]
+        I/O ports at da00 [size=8]
+
+===============================================================
+
+
+
+
+
+
+

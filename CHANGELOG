@@ -1,0 +1,225 @@
+svn 153:
+	new prototype functions to easier support new CAN hardware
+	genericfuncs.c, generichardware.h
+svn 144:
+	Phyton binding and example added
+
+4.0: svn 139:
+	- can4linux with support for CAN FD (in virtual CAN mode so far)
+	- examples can_send and receive-select with CAN FD support
+svn 134:
+	first version with a CAN bus simulation mode
+	implementing a virtual CAN bus
+svn 130: 
+	TX error counter and Rx error counter were exchanged in /proc ..
+svn 129: 
+	implement CAN error counters 
+	/proc/sys/dev/Can/TxErrCounter
+	/proc/sys/dev/Can/RxErrCounter
+	(for sja1000 up to now)
+svn 127: 
+	allow only the first process opening a device to use
+	ioctl() functions like CAN_StopChip(), CAN_StartChip()
+	CAN_ChipReset() or CAn_TxFiFoInit().
+svn 88: 
+	Release of the Contemporary Controls CANPCI-CO/DN
+	with LED cotrol
+svn 80: 
+	First version supporting the Contemporary Controls CAN Interface 
+	CANPCI-CO/DN, one channel CAN/CANopen and DeviceNet 
+svn 70:
+	removed some errors in the MCP2515 code
+svn 65:
+	Fork of the SPI connected Microchip MCP2515 to TARGET=MCP2515SPI
+	which is controlled by the kernel SPI sub layer.
+	Still existing are TARGET=SSV_MCP2515 and AuR_MCP2515
+	where the SPI controller is directly used by can4linux.
+svn 62:
+	corrected register access Makros for TARGET KVASER_PCICAN
+svn 59:
+	Support for a second target using ATMEL ARM9 with a external CAN
+	via SPI, the Microchip MCP2515, using direct SPI access.
+
+	the driver loadable module name is now can4linux
+	to avoid conflicts with Socket CAN modules.
+
+3.5.7: svn 55
+	Support for FlexCAN on imx25 with /dev/can0 and /dev/can1
+	testet on Ka-Ro TX25 module
+	Both CAN modules are working with internal bus-clock (66.5 MHz)
+	#define CAN_IS_USING_BUS_CLOCK is set
+svn 53:
+	finally got FlexCAN on imx35 working with the external clock
+	if CAN_IS_USING_BUS_CLOCK is _not_ defined
+	BUT take care, the default clock as shown in
+	/proc/cpu/clocks is
+	ckie-0            24576000
+	which is not a good frequency to generate CAN bit rates.
+	We used exactly 24.00 Mhz and this is table for in imx35flexcan.h 
+svn 51:
+	new board supported: RTD ECAN1000 PC104 board
+	http://www.rtd.com (Will Tate <willytate@users.sourceforge.net>)
+svn 49:
+	update Kvaser CANPCI to use current pci scan function
+svn 45:
+	adopted to the changed syctl of kernel 2.6.34
+	can be used with SUSE 11.3 now.
+3.5.6 - svn: 40; 
+        New Target  FlexCAN on imx35
+        =======
+        because svn on SourceForge is used, we don't provide a new
+        tgz archive for every checkin.
+        The CHANGELOG therefore lists the version number available
+        at /prc/sys/dev/Can/version
+        and the svn revision number
+3.5.5 - New Target PCM3680 and JANZ_PCIL (Janz AG)
+3.5.4 - New Targets, PCM9890 and EMS CPC_PCI2(4 channel PCI)
+	ATCANMINI_PELICAN reactivated
+3.5.3 - For some reasons, parameter location changed from
+	/proc/sys/Can/* to /proc/sys/dev/Can/*
+      - support for CAN_MAX_OPEN for the ATMEL AT91SAM9263
+      - common code base now for most CAN chips supported
+      - support for the new CPC_PCI with up to four CAN controllers
+      	still preliminary, need to combine the _old_ and _new_
+      	in any combination
+      - new TARGET=MMC_SJA1000, ARM AT91SAM9269 with 3 external
+        SJA1000 with multiplexed memory access.
+      - new TARGET=SSV_MCP2515
+3.5.2 - More than one process can now open the driver
+	This number is defined at compile time.
+	Can be set in the Makefile or in defs.h 
+	e.g. CAN_MAX_OPEN=4
+	This feature is currently on the sja1000 only supported
+	and only tested with the CPC-PCI interface
+
+      - ioctl return value changed to 0 on successful return
+	extended selfreception flag from 'per channel (minor)' to
+	  'per process'
+      - prohibit setting a new bitttime if the channel was already opened
+	  by another process, setting the same bitrate as the first
+	  process is permitted
+      - this version should at least compile up to kernel 2.6.22
+	testet on 2.6.22 quad core
+3.4.6 - udev support
+3.4.5 - Tested on SMP and 64 Bit X86 machines
+	made some 64 bit type adoptions
+3.4.4 - removed Bug in mcf5282 when transmitting from ISR
+3.4.3 - removed warnings
+	ignoring return value of 'copy_to_user'
+	with kernel version 2.6.16.21
+      - introducing general DEFS compiler settings.
+	used for e.g. -Wno-undef
+3.4.2 - Support for EMS CPC-104 (PC104 containing SJA1000)
+        changed type of can_base[] to __iomem (contains virtual address)
+3.4.1 - bug in mcf5282 interrupt handling which selfreceived messages 
+        removed
+3.4   - new release with changing the directory structure 
+        all files without can_ prefix, because we are in the can4linux
+        sub directory
+      - read() and write() are now blocking per default
+      - getting the time stamp information for received messages
+        in canmsg_t can be switched off if not needed
+        (saves some us ISR time)
+      - supported controllers and CAN interface boards now additional:
+        Kvaser PCIcan-Q 
+        MPL VCMA9 
+        Analog Devices BlackFin 537
+        Freescale 5282
+
+3.3.6 - read() is now a blocking read if not opened with O_NONBLOCK
+3.3.5 - new ioctl() direkt setting of BTR registers
+	each value is possible now using this ioctl()
+3.3.4 - two new ioctl() configuration commands for sja1000 devices
+	self reception mode - each message sent is delivered back
+	      in the rx queue
+	listen only mode (CAN controller doesn't acknowledge frames)
+3.3.3 - removed cli()/sti() code sections
+      - use __iomem 	
+
+3.3 - can4linux for LINUX Kernel build 2.6 in new directury
+      more simple directory structure and using the kernel module build
+
+3.2 - Changed Structures compatible between all hardware variants
+      Modified and extended to support Generic i82527 cards and
+      the SBS PC7compact DINrail mounted industry PC
+      by FOCUS Software Engineering Pty Ltd <www.focus-sw.com>
+
+3.1 - Added support for SSV TRM/816 by Sven Geggus <geggus@iitb.fraunhofer.de>
+      new hardware configuration CAN_INDEXED_PORT_IO used on Elan
+    - updated examples (esp. can_send.c to new 3.0 CanStatusPar_struct.
+
+3.0 - going further into compiling the driver directly for the hardware
+      specified in Makefile
+      Removing old code
+        - the old 82cC200 is not longer supported
+          only sja1000 in PeliCAN mode
+        - begin canceling support for OS < 2.4.0
+      new pci detection code, using improved linux pci bios features
+      PCI cards should be detected in other PCI busses as 0 as well
+      - Changed the CanSja1000Status_par_t to a more generic one 
+        CanStatusPar_t
+
+2.6 - 2.5 had a very serious bug. Because of wrong index definitions into
+      the Sysctl array, it was possible to set the Base address and IRQ
+      to 0 when using the CPC-PCI board
+
+2.5 - removed bug in can_ioctl(); thanks to stefan.panwinkler@contec.at
+      Suport for Advantech Pcm-3680
+
+2.4 - because the driver must be compiled for a specific TARGET
+      now some "configuration" values are preset at compile time:
+      IOModel, Outc, VendOpt.
+      nevertheless, Outc can be overwritten
+    - Makefile checks for supported TARGET
+
+
+2.3 - /proc/sys/CAN/version now contains also the target name can4linux
+    is compiled for
+    - ioctl() get status returns additional the size and 
+      number of rx and tx messages in buffers
+    - improved tx buffer handling 
+    - Support I+ME PcSlimLine ISA card with SJA1000
+
+!!!!!!!!
+2.2 - may be somethg wrong with this version with the CPC-PCI support !!!!
+!!!!!Unterst.Controller: SJA1000
+     Karten: ATCANMINI_BASIC, ATCANMINI_PELICAN
+	CPC_PCI, IXXAT_PCI03
+ 
+2.1 - freigegeben
+     2.0 - (nicht released)
+     erste Version abgerüstet,
+     Übersetzbar ohne LDDK und nur für einen Controller-typ,
+     bzw. Kartentyp, Auswählbar zur Kompile-Zeit,
+     dadurch für embedded Systeme verwendbar (benötigt weniger Speicher)
+
+     Dokumentation als HTML, erzeugt mit Doxygen
+
+--------------------------------------------------------------------------
+1.4 - Anpassung Headerfiles an 2.4.18 - warnings beseitigt
+
+1.3 - Überarbeitung für 2.4.x
+    nur mit lddk 1.p4
+    jetzt sollte es wirklich gehen
+    (getestet mit 3*AT-CAN-MINI, )
+
+1.2 - aktuelle Bugbeseitigung für Bauer
+    nur mit lddk 1.p3
+    Übersetzbar auch auf neueren Kernel 2.4.4 (nicht für alle Rechner!)
+
+1.1 - Unterstützung für ELIMA
+     und alle Kernelversionen bis 2.3.x
+     (2.0, 2.2, 2.4.0)
+
+1.0p1 - Support für intel82527 verbessert, Bugbeseitigung
+    - Codebereinigung
+      (Arbeitet immer noch mit der gleichen LDDK Version wie 1.0)
+
+1.0 - erste stabile Version
+      unterstützt 82c200/sja100
+	  AT-CAN-MINI
+	  ....
+      unterstützt 82527
+	  CPC-XT
+
+

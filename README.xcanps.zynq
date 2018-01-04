@@ -1,0 +1,253 @@
+README.xcanps.zynq
+
+This README covers the XCANPS Xilinx CAN controller
+as it is implemented in the XILINX Zync SoC device.
+Which is used on the Avnet ZedBoard.
+CAN Signals are routed to the FMC ISM Board
+using EMIO Signals via PL.
+
+Restrictions (Features)
+===========================================================================
+- The CAN TX FIFO is not used.
+  instead the software FIFO is used, and only one CAN frame a time
+  is feed into the CAN controllers hardware FIFO
+- The high priority TX buffer of the CAN controller is not used
+- Listen only mode not yet supported
+
+- The driver can be (and is) compiled with  -DCANFD defined.
+  For data transfer between application an driver long CAN frames
+  with 64 byte date are used. Don't forget to specify it
+  with all user code as well and the can4linux-examples.
+  Using the CANFD flag the driver can be used in virtual CAN mode
+  to simulate CAN-FD locally in a virtual CAN network
+  and CAN controller hardware is not used.
+- Acceptance filter not used yet, All frames pass to the RXFIFO 
+- Both CAN0 and CAN1 can be used
+  (CAN1 not tested yet because of limited hardware)
+
+- no error handling yet (Bus-off, Error Passive, CAN errors, ..)
+  
+
+PIN assignment from the Zynq Processing System to the FMC connector
+===========================================================================
+# ----------------------------------------------------------------------------
+#
+# CAN0 / CAN1  Pin assignment to FMC
+# ----------------------------------------------------------------------------
+
+# Bank 34, Vcco = Vadj
+#
+# CAN0 RX
+NET  processing_system7_0_CAN0_PHY_RX LOC = F19  | IOSTANDARD=LVCMOS18;  # "FMC-LA22_N"
+
+# CAN1 RX
+NET  processing_system7_0_CAN1_PHY_RX    LOC = L22  | IOSTANDARD=LVCMOS18;  # "FMC-LA06_N"
+
+
+# CAN1 TX
+NET processing_system7_0_CAN1_PHY_TX    LOC = N22  | IOSTANDARD=LVCMOS18;  # "FMC-LA03_P"
+
+# Bank 35, Vcco = Vadj
+# CAN0 TX
+NET  processing_system7_0_CAN0_PHY_TX    LOC = N20  | IOSTANDARD=LVCMOS18;  # "FMC-LA01_CC_N"
+
+
+Compiling:
+===========================================================================
+Get the sources
+svn co https://can4linux.svn.sourceforge.net/svnroot/can4linux/trunk trunk
+cd to can4linux.
+Edit cross-zedboard according to your environment
+(kernel sources, cross-compiler and other tools location,..)
+Source this environment before calling make.
+Use the target specific Makefile-zedboard.s
+(There exist a small script for setting this up
+ ./target zedboard )
+
+Take care to set the -DCAN_SYSCLK according the settings in XPS
+with the CAN module input frequency. Bit-timing tables are provided
+already for some input frequencies. It is suggested to use 20MHz.
+
+Copy the canflinux.ko kernel module to the ZedBoard Linux 
+/lib/modules/`uname -r`/
+call
+# modprobe can4linux
+It will result in a loaded kernel module and two device entries
+/dev/can[01]
+
+/ # ls -l /dev/can*
+crw-rw----    1 root     0          91,   0 Jan  1 00:16 /dev/can0
+crw-rw----    1 root     0          91,   1 Jan  1 00:16 /dev/can1
+
+Other entries are only available if a CAN device is open:
+
+/ # cat /proc/iomem
+00000000-1fffffff : System RAM
+  00008000-0040b71b : Kernel code
+  00434000-00482253 : Kernel data
+   ....
+e0008000-e0008fff : CAN-IO
+e0009000-e0009fff : CAN-IO
+   ....
+
+Examples are as usual in can4linux-examples.
+e.g. can_send, receive, receive-select
+
+more information are available in the source code documentation
+at http://www.can-wiki.info/can4linux/man/index.html 
+
+
+
+
+
+Bit Timing considerations
+-------------------------------------------------------------------------------
+
+The Xcanps has two Time Segment Registers TS1 and TS2.
+TS1 combines the Propagation Segment plus the Phase1 Segment
+TS2 is the Phase2 Segment.
+The bit time consists therefore of three parts
+Sync Segment + TS1 + TS2.
+
+Input is a CAN_REF_CLK 
+which is normally sourced from the PS clock subsystem.
+Internally, the PS has three PLLs and two clock divider pairs.
+The clock source choice,
+PS clock subsystem or external MIO pin,
+is controlled by the CAN_MIOCLK_CTRL register.
+
+The CAN clocks in the PS are controlled by slcr.CAN_CLK_CTRL.
+The generation of the CAN reference clock by the PS
+is described in section 25.6.4 (UG585) CAN Clocks.
+There is one clock generator in the PS for both CAN controllers.
+
+See also p 490, Ch 18.4.1 Clocks
+
+
+The example is using 1000 Mhz as PLL input divided by 42.
+This results in a CAN clock of 23.8095 MHz
+which is not very useful for established CAN bit Rates.
+It would be much better to reach 20 MHz by dividing by 50.
+
+See also kernel sources drivers/clk/zynq/clk.c
+and
+./arch/arm/mach-zynq/include/mach/zynq_soc.h
+./arch/arm/mach-zynq/slcr.c
+
+For calculating the BRPR and BTR register values
+the bit timing calculator
+at http://www.port.de/cgi-bin/tq.cgi?ctype=Philips&CLK=20&sample_point=87.5
+can be used.
+The Table shows the values for CAN clock 20 MHz
+and the CiA suggested Sample Point at 87.5%.
+Use the calculated value BTR0 directly as BRPR value
+and the calculated value BTR1 directly as BTR value.
+Bits 0..3 for TS1 and 4..6 for TS2 are the same.
+The SAM bit for the sja1000 is not used by the calculator and always zero.
+The SJW (Synchronization Jump Width) on bits 7..8 are always set to be zero
+in the XCANPS BTR Register.
+
+
+
+
+
+
+
+
+
+
+Xilinx xcanps Sources are at
+/opt/Xilinx/14.3/SDK/SDK/sw/XilinxProcessorIPLib/drivers/canps_v1_01_a/
+
+
+Platformdata
+linux-xlnx/arch/arm/mach-zynq
+
+example for setting GPIOs in board_zc770.c
+
+    #define USB_RST_GPIO	7
+
+	if (gpio_request(USB_RST_GPIO, "USB Reset"))
+		printk(KERN_ERR "ERROR requesting GPIO, USB not reset!");
+
+	if (gpio_direction_output(USB_RST_GPIO, 1))
+		printk(KERN_ERR "ERROR setting GPIO direction, USB not reset!");
+
+	gpio_set_value(USB_RST_GPIO, 1);
+	gpio_set_value(USB_RST_GPIO, 0);
+	gpio_set_value(USB_RST_GPIO, 1);
+
+
+For now, the driver is not using the Linux Device Tree 
+for obtaining CAN parameters.
+In case someone is interested in doing it,
+here are my basic research results so far:
+
+
+accessing device tree information
+http://stackoverflow.com/questions/9606709/how-to-access-and-debug-a-fdt-dts-device-tree-from-a-linux-driver-seg-fault
+char *path = "/fpga_dt@c0000000";
+struct device_node *dt_node;
+const u32 *property;
+int len;
+
+dt_node = of_find_node_by_path(path);
+if (!dt_node) {
+  printk(KERN_ERR "(E) Failed to find device-tree node: %s\n", path);
+  return -ENODEV;
+}
+printk(KERN_INFO "(I) Found device-tree node.  Now retrieving property.\n");
+
+property = of_get_property(dt_node, "reg", &len);
+
+printk(KERN_INFO "(I) len=%d\n", len);
+printk(KERN_INFO "(I) reg[0]=0x%08lX\n", (unsigned long) property[0]);
+printk(KERN_INFO "(I) reg[1]=0x%08lX\n", (unsigned long) property[1]);
+printk(KERN_INFO "(I) reg[2]=0x%08lX\n", (unsigned long) property[2]);
+
+There are also system utilities available
+system/extended-system-utilities
+e.g. /usr/sbin/prtconf
+
+re 
+
+A Tutorial on the Device Tree (Zynq)
+http://xillybus.com/tutorials/device-tree-zynq-1
+
+
+Since kernel version 3.10 some dts files are available describing CAN
+
+
+wiki
+http://www.devicetree.org/Device_Tree_Usage
+official document 
+https://www.power.org/documentation/epapr-version-1-1/
+
+A Tutorial on the Device Tree (Zynq) 
+http://xillybus.com/tutorials/device-tree-zynq-1
+
+
+cat /proc/device-tree/amba@0/ps7-can@e0008000/name
+ps7-can
+/ # cat /proc/device-tree/amba@0/ps7-can@e0008000/compatible 
+xlnx,ps7-can-1.00.a
+
+/ # cat /proc/device-tree/amba@0/ps7-can@e0008000/clock-names 
+ref_clkaper_clk 
+
+/ # hexdump -C  /proc/device-tree/amba@0/ps7-can@e0008000/clocks
+00000000  00 00 00 02 00 00 00 13  00 00 00 02 00 00 00 24  |...............$|
+
+/ # cat  /sys/devices/amba.0/e0008000.ps7-can/modalias 
+platform:e0008000.ps7-can
+
+
+Need platform data not fom c-source (arch/arm/...)
+but from device tree
+
+
+Another Device Tree information
+https://docs.google.com/document/d/17P54kZkZO_-JtTjrFuVz-Cp_RMMg7GB_8W9JK9sLKfA/pub
+
+
+

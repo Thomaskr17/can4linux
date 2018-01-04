@@ -1,0 +1,51 @@
+# Environment and files as used for A&R CPU CAB3 Atmel AT91SAM9G45
+# Look at all settings and change according your set-up
+#
+ARCH=arm
+CROSS_COMPILE=arm-none-linux-gnueabi-
+CROSS_TOOL_PATH=/home/oertel/CodeSourcery/Sourcery_G++_Lite/bin
+PATH=$PATH:$CROSS_TOOL_PATH
+CC=${CROSS_TOOL_PATH}/arm-none-linux-gnueabi-gcc
+AR=${CROSS_TOOL_PATH}/arm-none-linux-gnueabi-ar
+LD=${CROSS_TOOL_PATH}/arm-none-linux-gnueabi-ld
+RANLIB=${CROSS_TOOL_PATH}/arm-none-linux-gnueabi-ranlib
+DEPMOD=${CROSS_TOOL_PATH}/arm-none-linux-gnueabi-depmod-2.6
+
+[ ${KDIR} ] || KDIR=/home/oertel/aur_linux-2.6.30.10/
+DEPLOYDIR=
+DESTDIR=$(dirname $(pwd))/install/arm
+LD_LIBRARY_PATH=${DEPLOYDIR}/lib/
+
+LIBS=
+CFLAGS="-Wall -Wstrict-prototypes -Os -Wl,-s"
+LDFLAGS=
+
+export ARCH
+export CROSS_COMPILE
+export CC
+export AR
+export LD
+export RANLIB
+export DEPMOD
+export LIBS
+export CFLAGS
+export LDFLAGS
+export DEPLOYDIR
+export DESTDIR
+export KDIR
+
+echo
+echo "ARCH            " $ARCH
+echo "CROSS_COMPILE   " $CROSS_COMPILE
+echo "CC              " $CC
+echo "AR              " $AR
+echo "LD              " $LD
+echo "RANLIB          " $RANLIB
+echo "DEPMOD          " $DEPMOD
+echo "KDIR            " $KDIR
+echo "LIBS            " $LIBS
+echo "CFLAGS          " $CFLAGS
+echo "LDFLAGS         " $LDFLAGS
+echo "DEPLOYDIR       " $DEPLOYDIR
+echo "DESTDIR         " $DESTDIR
+echo

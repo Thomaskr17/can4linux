@@ -1,0 +1,30 @@
+#!/bin/sh
+# set Can debug level
+# and show all /proc entries
+
+PROC=/proc/sys/Can
+PROCN=/proc/sys/dev/Can
+
+#display if there are any entries
+ls -d /proc/sys/dev/Can*
+
+if [ -d $PROC ]; then
+  echo $1 > $PROC/dbgMask
+  grep . $PROC/*
+  exit 0
+fi
+
+
+for d in  ${PROCN}*
+do
+    if [ -d ${d} ]; then
+      echo $1 > $d/dbgMask
+      grep . $d/*
+      x=true
+    fi
+done
+
+if [ x$x = x ]; then
+    echo "** ERROR: Driver not present !"
+    exit 1
+fi

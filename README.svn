@@ -1,0 +1,75 @@
+Some words on using svn and can4linux on SourceForge
+====================================================
+
+To get a new working copy freshly from SourceForge do
+svn co https://svn.code.sf.net/p/can4linux/code/trunk can4linux-code
+
+results in two directories 
+
+    can4linux-code/can4linux
+    can4linux-code/can4linux-examples
+
+
+with one containing the driver sources, the other one containing some useful
+examples.
+
+and later update your local copy using
+% svn update
+
+
+TkCVS or any other tool can be used. Sometimes its faster using the 
+command line.
+
+To see what you have changed use
+% svn status
+
+The result displays a letter in the first column where
+  M - means modified
+  A - means added
+  D - deleted
+
+To see changes against the server
+% svn status -uv
+
+
+If you have created a new file, use
+% svn add file
+first.
+
+
+Later you have to commit your changes. Using the command line,
+svn will call an editor ( export SVN_EDITOR=vim )
+
+
+You can get a clean version of the project by using
+% svn export
+e.g.
+$ svn export https://can4linux.svn.sourceforge.net/svnroot/can4linux/trunk  /tmp/can4linux
+$ svn export https://svn.code.sf.net/p/can4linux/code/trunk /tmp/can4linux
+
+or if you have already a local copy of the repository
+$ svn export . /tmp/can4linux
+
+or 
+svn export  . ../can4linux_svn`svnversion .`
+
+An exported version does not contain subversion information and can not be updated later.
+
+
+To get the latest version number local or from the server
+svn info
+svn info https://svn.code.sf.net/p/can4linux/code
+
+Make a 'tag'
+A final version can be given a name tag
+
+$ svn copy https://svn.code.sf.net/p/can4linux/code/trunk \
+    https://svn.code.sf.net/p/can4linux/code/tags/can4linux-4.1 \
+    -m "Tagging can4linux release 4.1"
+
+
+
+option use -r revision
+
+svn propset svn:keywords "Date Revision" version.inc
+

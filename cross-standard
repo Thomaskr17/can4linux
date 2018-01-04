@@ -1,0 +1,6 @@
+# Host environment, 
+# by default the Makefile standard is looking for the kernel at
+# KDIR 	:= /lib/modules/$(shell uname -r)/build/
+[ ${KDIR} ] || KDIR=/lib/modules/`uname -r`/build/
+echo "ARCH =     $ARCH"
+echo "KDIR =     /lib/modules/`uname -r`/build/"

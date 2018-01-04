@@ -1,0 +1,36 @@
+Janz CAN-PCIL board
+
+Referring the CAN-PCIL Hardware Manual Version 2.0 2012
+
+Besides the up to 4 CAN controllers, the board has additional components
+
+- Two Status LEDs per CAN channel (only base board, not the extension module)
+	The two LEDS, red and green, can be switched on/off by ioctl() calls.
+	see can4linux-examples/canled.c
+
+- software controlled CAN line termination resistor 
+	The CAN termination resistor can be switched on/off by ioctl() calls.
+	see can4linux-examples/canterm.c
+
+- Hex coded switch to identify the board
+	located in PCI base address register 4, at address 0x03
+	 The board id is available in /proc/sys/dev/Can/BoardId
+
+
+At load time the LSB of the PCI subsystem ID is printed.
+It contains the CAN-PCIL hardware revision code
+
+-------------------------------------
+lspci:
+04:05.0 CANBUS: PLX Technology, Inc. PCI9030 32-bit 33MHz PCI <-> IOBus Bridge (rev 0a)
+        Subsystem: Janz Computer AG Device 1a00
+        Flags: medium devsel, IRQ 20
+        Memory at febffc00 (32-bit, non-prefetchable) [size=128]
+        I/O ports at ec00 [size=128]
+        Memory at febfe000 (32-bit, non-prefetchable) [size=4K]
+        Memory at febfd000 (32-bit, non-prefetchable) [size=4K]
+        Memory at febfc000 (32-bit, non-prefetchable) [size=4K]
+        Capabilities: [40] Power Management version 1
+        Capabilities: [48] CompactPCI hot-swap <?>
+        Capabilities: [4c] Vital Product Data
+

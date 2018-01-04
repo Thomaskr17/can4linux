@@ -1,0 +1,74 @@
+#!/bin/sh
+
+echo "Configuring CAN Subsystem"
+
+#default values
+#----------------------------------------
+debug=0
+
+Base_0=0
+Irq_0=0
+Baud_0=125
+AccMask_0=0xffffffff
+AccCode_0=0xffffffff
+Timeout_0=100
+Outc_0=0
+
+Base_1=0
+Irq_1=0
+Baud_1=125
+AccMask_1=0xffffffff
+AccCode_1=0xffffffff
+Timeout_1=100
+Outc_1=0
+
+Base_2=0
+Irq_2=0
+Baud_2=125
+AccMask_2=0xffffffff
+AccCode_2=0xffffffff
+Timeout_2=100
+Outc_2=0
+
+
+Base_3=0
+Irq_3=0
+Baud_3=125
+AccMask_3=0xffffffff
+AccCode_3=0xffffffff
+Timeout_3=100
+Outc_3=0
+#----------------------------------------
+
+if [ -r "$1" ]; then
+# now read parameters from file.conf overwrite default values
+echo "reading parameter values from $1"
+. $1
+else
+ if [ -r /etc/can.conf ]; then
+ . /etc/can.conf
+ else
+   echo "** ERROR: Can't read Config File '$1' "
+   exit 1
+ fi
+fi
+
+proc=/proc/sys/dev/Can
+
+if [ ! -d $proc ]; then
+  echo "** ERROR: Driver not present !"
+  exit 1
+fi
+
+
+echo "$debug" > $proc/dbgMask
+
+echo "$Base_0 $Base_1 $Base_2 $Base_3 > $proc/Base"
+echo "$Base_0 $Base_1 $Base_2 $Base_3" > $proc/Base
+echo "$Irq_0 $Irq_1 $Irq_2 $Irq_3" > $proc/IRQ
+echo "$Baud_0 $Baud_1 $Baud_2 $Baud_3" > $proc/Baud
+echo "$AccCode_0 $AccCode_1 $AccCode_2 $AccCode_3" > $proc/AccCode
+echo "$AccMask_0 $AccMask_1 $AccMask_2 $AccMask_3" > $proc/AccMask
+echo "$Timeout_0 $Timeout_1 $Timeout_2 $Timeout_3" > $proc/Timeout
+echo "$Outc_0 $Outc_1 $Outc_2 $Outc_3" > $proc/Outc
+

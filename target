@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+#
+echo "Select Target compilatiion environment"
+echo "======================================"
+echo ""
+echo "./target <target>"
+echo "where <target> = standard | at9263 | ecan9 | imx25 | imx28 | imx35"
+echo "             | mcp2515spi | mcp2515 | mcp2515aur | mmc | multilog" 
+echo
+echo "at9268     - ATMEL AT91SAM9263 internal CAN controller"
+echo "ecan9      - Freescale FlexCAN iMX28 (EMS EtherCAN/ARM9)"
+echo "imx25      - Freescale FlexCAN iMX25 (Ka-Ro TX25)"
+echo "imx28      - Freescale FlexCAN iMX28 (Ka-Ro TX28)"
+echo "imx35      - Freescale FlexCAN iMX35 (Freescale PDK)"
+echo "mcp2515spi - with external MCP2515 using kernel SPI driver"
+echo "mcp2515    - SSV ATMEL9263 with external MCP2515, direct SPI register acc"
+echo "mcp2515aur - A&R ATMEL9G45 with external MCP2515, direct SPI register acc"
+echo "mmc        - Heyfra MMC, ATMEL AT91SAM9260, 3 external SJA1000"
+echo "multilog   - Hansenhof MULTILOG32, ARM9 with 2 external SJA1000"
+echo "zedboard   - Xilinx Zynq on ZedBoard, Xilinx XCAN module"
+echo
+echo "standard   - local host PC, using the local kernel source tree"
+echo "          call 'make TARGET=X' for different supported boards" 
+echo "          call 'make help' for a list of supported boards" 
+
+echo ""
+echo "the script does: ln -s Makefile-$1 Makefile"
+echo "before calling make, adjust cross-$1 and source it in"
+
+if [ ! -e Makefile-$1 ]
+then 
+    echo ""
+    echo "===> target $1 not supported"
+    echo ""
+    exit
+fi
+
+rm -rf Makefile
+ln -s  Makefile-$1 Makefile
+unset KDIR
+# load new environment for cross compilation
+source ./cross-$1
+
+echo "==================================================="
+echo "NOW do:"
+echo "$ unset KDIR"
+if [ "xstandard" == "x$1" ]
+then
+    echo "unset ARCH CROSS_TOOL_PATH CROSS_COMPILE LD"
+else 
+    echo "$ . cross-$1"
+fi

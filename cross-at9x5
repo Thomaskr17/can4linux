@@ -1,0 +1,49 @@
+ARCH=arm
+CROSS_TOOL_PATH=/usr/local/angstrom/arm/bin
+CROSS_TOOL_PATH=/opt/arm-2011.03/bin/
+CROSS_COMPILE=arm-none-linux-gnueabi-
+PATH=$PATH:$CROSS_TOOL_PATH
+CC=${CROSS_TOOL_PATH}/${CROSS_COMPILE}-gcc
+AR=${CROSS_TOOL_PATH}/${CROSS_COMPILE}-ar
+LD=${CROSS_TOOL_PATH}/${CROSS_COMPILE}-ld
+RANLIB=${CROSS_TOOL_PATH}/${CROSS_COMPILE}-ranlib
+DEPMOD=${CROSS_TOOL_PATH}/${CROSS_COMPILE}-depmod-2.6
+
+[ ${KDIR} ] || KDIR=/opt/linux-2.6.39
+DEPLOYDIR=
+DESTDIR=$(dirname $(pwd))/install/arm
+LD_LIBRARY_PATH=${DEPLOYDIR}/lib/
+
+LIBS=
+CFLAGS="-Wall -Wstrict-prototypes -Os -Wl,-s"
+LDFLAGS=
+
+export ARCH
+export CROSS_COMPILE
+export CC
+export AR
+export LD
+export RANLIB
+export DEPMOD
+export LIBS
+export CFLAGS
+export LDFLAGS
+export DEPLOYDIR
+export DESTDIR
+export KDIR
+
+echo
+echo "ARCH            " $ARCH
+echo "CROSS_COMPILE   " $CROSS_COMPILE
+echo "CC              " $CC
+echo "AR              " $AR
+echo "LD              " $LD
+echo "RANLIB          " $RANLIB
+echo "DEPMOD          " $DEPMOD
+echo "KDIR            " $KDIR
+echo "LIBS            " $LIBS
+echo "CFLAGS          " $CFLAGS
+echo "LDFLAGS         " $LDFLAGS
+echo "DEPLOYDIR       " $DEPLOYDIR
+echo "DESTDIR         " $DESTDIR
+echo

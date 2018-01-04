@@ -1,0 +1,102 @@
+# can4linux -- LINUX device driver Makefile
+# Copyright (c) 2008 port GmbH Halle/Saale
+# Used release tag for this software version
+
+include $(PWD)/version.inc
+
+#
+# The driver major device number
+# The new linux/Documentation/devices.txt defines major=91 for CAN
+CAN_MAJOR  = 91
+CAN_MODULE = can
+
+TARGET=MULTILOG_SJA1000
+
+# location of the compiled objects and the final driver module
+OBJDIR = obj
+
+# Debugging Code within the driver
+# to use the Debugging option
+# and the Debugging control via /proc/sys/Can/DbgMask
+# the Makefile in subdir Can must called with the DEBUG set to
+# DEBUG=1
+# else
+# NODEBUG
+# doesn't compile any debug code into the driver
+DEBUG=NODEBUG
+DEBUG=DEBUG=1
+
+# all definitions for compiling the sources
+# CAN_PORT_IO		- use port I/O instead of memory I/O
+# CAN_INDEXED_PORT_IO   - CAN registers adressed by a pair of registers
+#			  one is selcting the register the other one does i/O
+#			  used eg. on Elan CPUs
+# CAN_INDEXED_MEM_IO	- Two memory adresses are defined
+#			  the first address has to be written with the adress of
+#			  the CAN register to be addressed
+#		          the second one is used to read or write the value
+# CAN4LINUX_PCI
+# IODEBUG               - all register write accesses are logged
+# CONFIG_TIME_MEASURE=1 - enable Time measurement at parallel port
+#
+# MAX_CHANNELS          - max number of minor inodes supported
+#
+# CAN_MAX_OPEN		- the driver can be opened more than once
+#                         the number specifies the number of possible
+#			  different process, the number of RX queues
+#			  the driver has to handle
+#
+
+
+
+# Hansenhof Multilog32
+# using adress/data multiplexed SJA1000  PeliCAN ISA
+DEFS =  -D$(TARGET)\
+        -D$(DEBUG)\
+        -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_INDEXED_MEM_IO \
+	-DCAN_SYSCLK=8 \
+	-DMAX_CHANNELS=2 -DCAN_MAX_OPEN=2\
+		-Wno-undef
+	#-DCONFIG_TIME_MEASURE=1
+        #-DDEFAULT_DEBUG\
+
+
+EXTRA_CFLAGS =  $(DEFS) -DVERSION=\"$(DVERSION)_$(TARGET)\"
+PWD         :=  $(shell pwd)
+
+obj-m		:= $(CAN_MODULE).o
+# add other object modules here
+$(CAN_MODULE)-objs:=  core.o		\
+	    open.o		\
+	    read.o		\
+	    write.o		\
+	    ioctl.o		\
+	    select.o		\
+	    debug.o		\
+	    util.o		\
+	    sysctl.o		\
+	    async.o		\
+	    close.o		\
+	    multilog.o		\
+	    sja1000funcs.o	\
+
+
+.PHONY: all
+
+all:
+	@echo "CURDIR = $(CURDIR)"
+	@echo "CC = $(CC)"
+	test ! -d $(KDIR) || $(MAKE) -C $(KDIR) M=$(PWD) TARGET=$(TARGET) modules
+
+clean:
+	test ! -d $(KDIR) || $(MAKE) -C $(KDIR) M=$(PWD) TARGET=$(TARGET) clean
+
+#install:
+#	cp can.ko 
+#	-mknod /dev/can0 c $(CAN_MAJOR) 0
+#	chmod 666 /dev/can0
+
+inode:
+	@ echo "mknod  /dev/can0 c 91 0"
+	@ echo "mknod  /dev/can1 c 91 1"

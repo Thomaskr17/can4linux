@@ -1,0 +1,522 @@
+.\" can4linux install doc
+.\" this document is written in groff www.gnu.org/s/groff/
+.\" Konfiguration
+.\" :vi:source ex_for_this:
+.\" :vipdo: -ms -mwww:
+++.
+--.
+.br
+.ds CH can4linux \(em The Linux CAN device driver
+.ds LF Date: 2012/07/24 22:06:36
+.ds RF Page % of 6
+.SH
+.ps +4
+can4linux \(em The Linux CAN device driver
+.LP
+.B can4linux
+is a Linux CAN device driver for different CAN interface boards
+or embedded Linux devices having controllers
+with integrated CAN controllers.
+.
+.ig
+passive CAN interface boards with SJA1000 controller
+
+
+mit CAN 82c200/SJA1000 Controllern
+..
+.
+.LP
+Supported CAN controllers
+.TS
+l  s
+lw(1c) l.
+Stand alone CAN controllers
+_
+	Intel 82527
+	Microchip MCP2515 via SPI
+	NXP SJA1000/82C200
+.TE
+.TS
+l  s
+lw(1c) l.
+Integrated CAN controllers
+_
+	Freescale FlexCAN (i.MX, ColdFire)
+	Analog Devices BlackFin
+	ATMEL 
+.TE
+Since version 4.0, released July 2012,
+can4linux can be used in a
+.B "virtual CAN"
+mode without the need of a installed CAN hardware
+and it is prepared for the new CAN FD standard,
+presented by BOSCH in March 2012.
+.LP
+The virtual CAN mode is enabled by setting the module parameter 
+.CDS
+insmod can4linux.ko virtual=1
+.CDE
+or
+.CDS
+make simload
+.CDE
+To support CAN FD
+compile with 
+.CW -DCANFD .
+.LP
+.NH 
+Installation
+.LP
+Take care that the kernel sources and configuration files are available.
+It is useful to have loadable module support enabled.
+The
+.I sysctl
+interface must be enabled as well.
+.I .config
+must contain
+.CW \%CONFIG_PROC_SYSCTL=y .
+.LP
+To get the latest files stored on SourceForge, check out using
+.B svn :
+.CDS
+svn co https://can4linux.svn.sourceforge.net/svnroot/can4linux can4linux 
+.CDE
+.LP
+.LP
+Alternatively download can4linux, create a can4linux directory, e.g.
+.I can4linux
+and unpack the archive:
+.CDS
+$ mkdir can4linux
+$ cd can4linux
+$ tar zxvf ../can4linux*tgz
+.CDE
+The driver has to be compiled for each supported hardware.
+A list of supported boards can be found in the Makefile.
+It is displayed by typing
+.CDS
+$ make help
+.CDE
+Compile the driver with specifying the hardware target:
+.CDS
+$ make TARGET=ATCANMINI_PELICAN
+.CDE
+The driver object file
+.I can4linux.ko
+is created in the actual working directory.
+.LP
+Now create the necessary device entries by using make again:
+.CDS
+$ make inodes
+.CDE
+The default value for a CAN drivers major number is 91.
+Please check before using it if the major number is already used.
+(major 91 is a registered number for CAN drivers.)
+.CDS
+$ cat /proc/devices
+.CDE
+lists all devices major numbers in use.
+.LP
+Next go into
+.I etc .
+Look for a configuration that fits to your hardware.
+.LP
+In the most cases you can use one of the available:
+.I 2-at_can_mini.conf 
+or
+.I 1-cpcpci.conf 
+\&.
+.LP
+If you don´t see any pre-configured settings
+that match your hardware
+read your hardware manuals carefully
+and add a new entry.
+.LP
+Create a configuration file named according to the name of your computer.
+Your computers name is returned: 
+.CDS
+$ uname -n 
+uschi
+$ cp 1-cpcpci.conf uschi.conf
+.CDE
+.B
+Some entries are hardware dependant.
+Be careful when using your own hardware.
+.LP
+The content in the configuration file is used to overwrite
+the appropriate entries in the
+.I /proc
+file system.
+.CDS
+/proc/sys/dev/Can/*
+.CDE
+Now you can do a
+.CDS
+$ make load
+.CDE
+The driver
+.B can4linux.ko
+is loaded using 
+.CW insmod (1)
+and entries in
+.I /proc/sys/dev/Can/*
+are overwritten with the config file contents.
+.LP
+.B ATTENTION!
+When using PCI boards,
+the driver is using values obtained from the BIOS
+for addresses, access type and IRQ numbers.
+In this case these values are read-only and can not be overwritten.
+Ignore the warnings given while loading a configuration.
+.NH 2
+Installing a second can4linux driver
+.LP
+Sometimes it might be necessary
+to have two different CAN controllers supported.
+This will mostly happen on PC like systems,
+equipped with two different PCI boards for example.
+In this case select one TARGET as your default one.
+This one then is using the default device major number 91
+and the default module name
+.I can4linux.ko .
+.LP
+To compile a second (or more) can4linux driver,
+add the following lines in the target specific section of the Makefile
+.CDS
+ifeq "$(TARGET)" "CC_CANPCI"
+
+\f[CWB]CAN_MODULE_POSTFIX = _cc\fP
+\f[CWB]CAN_MODULE := $(CAN_MODULE)$(CAN_MODULE_POSTFIX)\fP
+\f[CWB]CAN_MAJOR  =	92\fP
+
+# Contemporary Controls
+# CC PCI PeliCAN  PCI (only with SJA1000) ------------------------------------
+# CANPCI-CO and CANPCI-DN
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCI \
+	-DCAN_PORT_IO   \
+	-DCAN_SYSCLK=8	\
+ 	-DMAX_CHANNELS=1 -DCAN_MAX_OPEN=2\
+	\f[CWB]-DCAN_MODULE_POSTFIX=\"$(CAN_MODULE_POSTFIX)\"\fP
+
+TARGET_MATCHED = true
+endif
+.CDE
+.
+.NH 
+Test
+.LP
+Change into the directory
+.I examples.
+and compile the applications there
+.CDS
+$ cd examples
+$ make
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o ctest.o ctest.c
+gcc   ctest.o   -o ctest
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o baud.o baud.c
+gcc   baud.o   -o baud
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o can_send.o can_send.c
+gcc   can_send.o   -o can_send
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o acceptance.o acceptance.c
+gcc   acceptance.o   -o acceptance
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o noiser.o noiser.c
+gcc   noiser.o   -o noiser
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o receive.o receive.c
+gcc   receive.o   -o receive
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o transmit.o transmit.c
+gcc   transmit.o   -o transmit
+gcc -Wall -I../src -DUSE_RT_SCHEDULING   -c -o can_verify.o can_verify.c
+gcc   can_verify.o   -o can_verify
+.CDE
+Before calling
+.CW ctest
+watch the message log of the driver
+in the file
+.I /var/log/messages.
+Open a separate window
+.B xterm
+.CDS
+$ tail -f /var/log/messages
+.CDE
+(super user access rights are needed on most systems)
+.LP
+In order to see more messages
+increase the debug level
+by writing to the /proc filesystem
+.CDS
+echo 7 > /proc/sys/dev/Can/dbgMask
+.CDE
+(super user access rights are needed on most systems)
+.LP
+or use the shell script
+.CDS
+\&./debug 7
+.CDE
+After the start of
+.CW ctest
+you will see the following in the message log
+.CDS no
+Sep 17 13:13:31 uschi kernel: Can: - :in  can_open
+Sep 17 13:13:31 uschi kernel: Can: - :in  CAN_VendorInit
+Sep 17 13:13:31 uschi kernel: Can: - :in  Can_RequestIrq
+Sep 17 13:13:31 uschi kernel: Can: - :Requested IRQ: 5 @ 0xce2e28c0
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :in  Can_WaitInit
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :in  Can_FifoInit
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :in  CAN_ChipReset
+Sep 17 13:13:31 uschi kernel: Can: - : INT 0x0
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :status=0x3c mode=0x1
+Sep 17 13:13:31 uschi kernel: Can: - :[0] CAN_mode 0x1
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :[0] CAN_mode 0x9
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :[0] CAN_mode 0x9
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :in  CAN_SetTiming
+Sep 17 13:13:31 uschi kernel: Can: - :baud[0]=125
+Sep 17 13:13:31 uschi kernel: Can: - :tim0=0x3 tim1=0x1c
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :[0] CAN_mode 0x9
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :in  CAN_SetMask
+Sep 17 13:13:31 uschi kernel: Can: - :[0] acc=0xffffffff mask=0xffffffff
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :[0] CAN_mode 0x9
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel: Can: - :in  CAN_StartChip
+Sep 17 13:13:31 uschi kernel: Can: - :[0] CAN_mode 0x9
+Sep 17 13:13:31 uschi kernel: 
+Sep 17 13:13:31 uschi kernel: Can: - :start mode=0x8
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+Sep 17 13:13:31 uschi kernel:  MODE 0x8, STAT 0x3c, IRQE 0xf,
+Sep 17 13:13:31 uschi kernel: Can: - :out  
+.CDE
+Other messages denote a corrupt or wrong *.conf configuration
+or using a not supported hardware.
+.LP
+Please start
+.CW can_send
+to send a CAN message with 8 data byte with the contents of 0x55:
+.CDS
+$ can_send -D can0 0x555 0x55 0x55 0x55 0x55 0x55 0x55 0x55 0x55
+.CDE
+After execution of
+.CW can_send
+there should be a CAN message on the bus.
+When the bus is not connected with a receiving device
+the CAN controller will continue to send the message
+because it doesn't receive an acknowledge.
+This behaviour is easy to trace with an oscilloscope.
+The chosen CAN identifier and the pattern of the data
+is quite easy to recognise and to measure.
+With a baud rate of 125 kBit/s the measurement of the
+shortest signal change should be 8 µs.
+.LP
+Reset the debug level of the driver:
+.CDS
+\&./debug 0
+.CDE
+.NH
+Entries in 
+/proc/sys/dev/Can
+.LP
+Older versions used to have these entries at
+.I /proc/sys/Can .
+Please see also the example in the configuration files
+.I etc/*.conf .
+.TS
+l | c | l.
+Entry	per channel	meaning
+_
+AccCode	*	CAN Controller Acceptance Code Register
+AccMask	*	CAN Controller Acceptance Maske
+Base	*	CAN Controller Address
+IOModel		One letter per channel for the IO-Model
+IRQ	*	IRQ Number
+Outc	*	Output Control Register
+Overrun	*	Overrun Flag of the channel
+RxErr	*	number of Rx errors
+RxErrCounter	*	CAN controllers RX error counter
+Timeout	*	Timeout value
+TxErr	*	Number of TX errors
+TxErrCounter	*	CAN controllers TX error counter
+CAN clock		Clock frequency used for the CAN controller
+dbgMask		global debug level
+version		versions string
+Chipset		CAN controller supported by the driver
+.TE
+.LP
+The values for the bit timing registers of the CAN controller
+for the bit-rates
+10,20,40,50,125,250,500,800 
+and
+1000 kBit/s
+are taken from internal tables.
+These tables are only valid 
+if the clock cycle of the CAN controller
+is 8 MHz (external 16 MHz quartz).
+When using a different clock cycle
+the bit timing registers are calculated as follows:
+.CDS
+BTR0 = (Baud >> 8) && 0xFF
+BTR1 =  Baud       && 0xFF
+.CDE
+Example for setting the bit rate to 125 kBit/s for a
+SJA1000 with a clock cycle of 10 MHz (20MHz),
+16 time quanta and the sampling point at 87.5%
+.CDS
+Calculated values for the bit timing register:
+                                              BTR0 = 0x04
+                                              BTR1 = 0x1c
+.CDE
+.CDS
+From this it follows that:
+                 Baud = (0x04 << 8) + 0x1c = 0x041c = 1052 
+.CDE
+.LP
+The site
+http://www.port.de/deutsch/canprod/sv_req_form.html
+provides a input form for bit timing calculation
+of the bit timing register.
+.LP
+.IP dbgMask
+global debug level
+.br
+default 0 - no debug messages
+.br
+every bit of this mask has a specified meaning.
+.KS
+.TS
+l l.
+Bit	meaning
+_
+0	Flag for setting all options=on
+1	log function entries
+2	log function exits
+3	log branches
+4	log data given to functions
+5	log interrupts
+6	log register info
+7	reserved
+.TE
+.KE
+.IP Outc
+The output control register of the
+Philips 82C200/SJA1000
+
+.NH
+DIL-NET-PC TRM/816 Hardware by SSV embedded Systems
+.LP
+The code was provided by
+.MTO geggus@iitb.fraunhofer.de "Sven Geggus" .
+Please read his
+.I README.trm816
+and the
+.I trm816/README .
+
+.NH
+PC104 board PC104-200 from ESD
+.LP
+.B can4linux was modified
+and extended to support the
+.URL http://www.esd-electronics.com/ "esd"
+elctronic system design GmbH
+PC/104-CAN Card
+by
+.MTO tchouto@fokus.fraunhofer.de "Jean-Jacques Tchouto" . 
+
+
+.NH
+Embedded controllers with internal CAN
+.LP
+These need cross compilation.
+Since 3.5.3 the Makefile concept has changed.
+
+There is a global Makefile, called Makefile-standard 
+and some specific target Makefiles called Makefile-target.
+A shell script can be used to switch between.
+.CDS
+./target mmc
+.CDE
+Calling ./target without arguments will tell you more.
+Settings for the cross compilation and location of kernel source files
+are handled via shell environment variables defined in files
+like cross-target.
+After setting your specific values,
+simply source these files into your shell environment
+and call make.
+.NH 2
+ATMEL AT91SAM9263
+.NH 2
+ATMEL AT919260 with external SJA1000
+.NH 2
+ATMEL AT91 wit MCP2515 via SPI
+.NH 2
+Freescale MCF5282
+.LP
+
+.NH
+In the case of ...
+.LP
+In the case of any malfunction of the driver, e.g.
+.B open ()
+returns
+EINVAL - invalid argument -,
+set the debugmask
+.B dbgMask
+to a higher level, and watch the system log at
+.I /var/log/messages .
+
+.NH
+Configuring the driver
+.LP
+Some configuration parameters of the driver,
+like bit rate, are accesible via the /proc/sys/Can/* entries. 
+Since version 3.5.3 the location is /proc/sys/dev/Can/*.
+
+To view the entries one can do
+.CDS
+$ cat /proc/sys/dev/Can/Baud
+125     125     125     250
+.CDE
+or to see all values
+.CDS
+/sbin/sysctl dev.Can
+.CDE
+and set values
+.CDS
+$ echo '250 250 500 125' > /proc/sys/dev/Can/Baud
+$ cat /proc/sys/dev/Can/Baud
+250     250     500     125
+.CDE
+Linux has special commands to handle these 
+.CDS
+$ /sbin/sysctl dev.Can.version
+dev.Can.version = 3.4_CPC_PCI
+.CDE
+And values can be set using
+.CDS
+$ sudo /sbin/sysctl -w dev.Can.dbgMask=7
+dev.Can.dbgMask = 7
+.CDE
+The changes you make do not apply across a reboot.
+In order for them to persist, you need to either:
+.ULS
+.LI
+Create a new startup script in an appropriate /etc/rc#.d directory
+which runs the cat or sysctl commands, or
+.LI
+Put "variable=value" lines into /etc/sysctl.conf.
+These lines are just like sysctl commands,
+without the 'sysctl' keyword or '-w' flag.
+For example:
+.CDS
+dev.Can.Baud = '125 125 125'
+.CDE
+.ULE

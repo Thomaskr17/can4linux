@@ -1,0 +1,12 @@
+When using the driver with TRM/816 Hardware by SSV embedded Systems
+(http://www.ssv-embedded.de) the DIL-NET-PC IO-Addresses and IRQ-lines
+have to be set up first.
+
+As this is not exactly a CAN-Driver issue I did not integrate this into the
+CAN-Bus driver!
+
+Instead I created a small utility called "dnpsetup" which has to be called
+_before_ the device driver is loaded.
+It can be found in the trm816/ sub-directory.
+
+Sven Geggus <geggus@iitb.fraunhofer.de>

@@ -1,0 +1,779 @@
+#
+#
+# can4linux -- LINUX device driver Makefile
+#
+# Copyright (c) 2004-2012 Heinz-Jürgen Oertel
+#
+
+M=$(shell pwd)
+include $(M)/version.inc
+
+
+KVERSION= $(shell uname -r)
+CONFIG := $(shell uname -n)
+
+# be prepared for RTLinux
+LINUXTARGET=LINUXOS
+#LINUXTARGET=RTLinux
+
+
+CTAGS =	elvtags -tsevl
+CTAGS =	ctags --c-types=dtvf
+CTAGS =	ctags 
+ECHO  = /bin/echo
+DATE  =$(shell date)
+
+TITLE = LINUX driver module example 
+
+#
+# The driver major device number
+# development starts with major=63
+#  (LOCAL/EXPERIMENTAL USE)
+# The new linux/Documentation/devices.txt defines major=91
+CAN_MAJOR=	91
+
+# the default name of the kernel module
+# if not set different in the target specific section
+CAN_MODULE_POSTFIX=
+
+CAN_MODULE = can4linux
+
+
+# definitions for the hardware target
+#########################################################################
+# Only AT-CAN-MINI can be compiled for 82c200 or PeliCAN mode.
+# All other Targets are assuming to have an SJA1000
+# CPC_PCI  implies PeliCAN
+##
+## Support for all PC compatible systems using the native compiler
+## TARGET= IME_SLIMLINE | ATCANMINI_PELICAN
+## | CPC_PCI | CPC_PCI2 | CPC_CARD | PCM3680 | PCM9890 
+## | IXXAT_PCI03 | CPC104_200 | SBS_PC7 | TRM816 | GENERIC_I82527
+## | CC_CANPCI  | KVASER_PCICAN | VCMA9 | CPC104 | CPC_PCM_104
+## | JANZ_PCIL | ECAN1000
+## 
+## or using the can4linux for other platforms
+##  ATMEL_SAM9 | SSV_MCP2515 | AuR_MCP2515 | MMC_SJA1000 | AD_BLACKFIN |
+## 
+## compile DigiTec FC-CAN as ATCANMINI_PELICAN
+## compile ARCOM(Eurotech) AIM104-CAN as ATCANMINI_PELICAN
+##          SJA1000 registers are mapped directly into the I/O space 
+## 
+## When crosscompiling, ensure that CC is set properly
+## try ./target 
+## for getting help and setting up the correct Makefile
+## 
+## Compiling options:
+##   V=1   - set verbose output of Linux kernel makefiles
+## 
+## make load 
+## will load the compiled module with hardware support
+## make simload
+## will load the same module but without accessing the hardware
+## and provides a virtual CAN network
+##
+
+# default, ISA Boards have to set ISA=TRUE
+ISA = FALSE
+# up to now look for the CONFIG Settings and convert to TARGET= ----
+# later we can improve it by checking directly
+#
+#   ifeq ($(CONFIG_CAN_MCF5282),m)
+#   can_objs += mcf5282funcs.o
+#   EXTRA_CFLAGS += -DMCF5282 -DMAX_CHANNELS=1 -DUSE_FASYNC
+#   TARGET=ColdFire_FlexCAN
+#   endif
+##
+
+
+##########################################################################
+ifdef CONFIG_CAN_ATCANMINI
+TARGET = ATCANMINI_PELICAN
+endif
+
+ifdef CONFIG_CAN_CPC_PCI
+TARGET = CPC_PCI
+endif
+ifdef CONFIG_CAN_KVASER_PCI
+TARGET = KVASER_PCICAN
+endif
+
+ifdef CONFIG_CAN_MCF5282
+TARGET = ColdFire_FlexCAN
+endif
+
+ifdef CONFIG_CAN_CANPCI
+TARGET = CC_CANPCI
+endif
+
+ifdef CONFIG_CAN_BLACKFIN
+TARGET = AD_BLACKFIN
+endif
+
+ifdef CONFIG_CAN_AT91SAM9263
+TARGET = ATMEL_SAM9
+endif
+
+ifdef CONFIG_CAN_MCP2515
+TARGET = SSV_MCP2515
+endif
+
+ifdef CONFIG_CAN_VCMA9
+TARGET = VCMA9
+endif
+
+ifdef CONFIG_CAN_JANZ_PCIL
+TARGET = JANZ_PCIL
+endif
+
+ifdef CONFIG_CAN_CTI_CANPRO
+TARGET = CTI_CANPRO
+endif
+
+ifdef THIS_IS_HERE_FOR_REFERENCE
+#							Tested with latest version
+# PCI
+#TARGET=CPC_PCI						X
+#TARGET=CPC_PCI2					X
+#TARGET=JANZ_PCIL					X
+#TARGET=CC_CANPCI					X
+#TARGET=KVASER_PCICAN					X
+# ISA
+#TARGET=ATCANMINI_PELICAN				X
+#TARGET=IXXAT_PCI03
+#TARGET=IME_SLIMLINE
+# PC104
+#TARGET=PCM3680
+#TARGET=PC104_200
+#TARGET=CPC104
+#TARGET=CPC_PCM_104
+#TARGET=PCM9890						X
+# other
+#TARGET=TRM816
+#TARGET=SBS_PC7
+#TARGET=AD_BLACKFIN
+#TARGET=VCMA9
+#TARGET=GENERIC_I82527
+#TARGET=CPC_CARD
+#TARGET=ECAN1000
+endif
+TARGET=RASPI
+
+##########################################################################
+
+
+TARGET_MATCHED = false
+# location of the compiled objects and the final driver module
+OBJDIR = obj
+
+# Debugging Code within the driver
+# to use the Debugging option
+# and the Debugging control via /proc/sys/dev/Can/DbgMask
+# the Makefile in subdir Can must called with the DEBUG set to
+# DEBUG=1
+# else
+# NODEBUG
+# doesn't compile any debug code into the driver
+DEBUG=NODEBUG
+DEBUG=DEBUG=1
+
+# all definitions for compiling the sources
+# CAN_PORT_IO		- use port I/O instead of memory I/O
+# CAN_INDEXED_PORT_IO   - CAN registers adressed by a pair of registers
+#			  one is selcting the register the other one does i/O
+#			  used eg. on Elan CPUs
+# CAN_INDEXED_MEM_IO	- Two memory adresses are defined
+#			  the first address has to be written with the adress of
+#			  the CAN register to be addressed
+#		          the second one is used to read or write the value
+# CAN4LINUX_PCI
+# IODEBUG               - all register write accesses are logged
+# CONFIG_TIME_MEASURE=1 - enable Time measurement at parallel port
+#
+# MAX_CHANNELS          - max number of minor inodes supported
+#
+# CAN_MAX_OPEN		- the driver can be opened more than once
+#                         the number specifies the number of possible
+#			  different process, the number of RX queues
+#			  the driver has to handle
+#
+
+
+
+ifeq "$(TARGET)" "CPC_PCI"
+# EMS Wï¿½nsche CPC-PCI PeliCAN  PCI (only with SJA1000) ------------------------
+# http://www.ems-wuensche.com
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCI \
+	-DCAN_MAX_CHANNELS=4 -DCAN_MAX_OPEN=4 -DCAN_SYSCLK=8 \
+	-DCANFD
+
+	#-DIODEBUG
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "CPC_PCI2"
+# EMS Wï¿½nsche CPC-PCI PeliCAN  version2, up to 4 CAN channels -----------------
+# http://www.ems-wuensche.com
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCI \
+	-DCAN_MAX_CHANNELS=4 -DCAN_MAX_OPEN=4 -DCAN_SYSCLK=8 
+
+	#-DIODEBUG
+
+TARGET_MATCHED = true
+endif
+
+
+ifeq "$(TARGET)" "KVASER_PCICAN"
+# KVASER
+# PCIcan PeliCAN  PCI (up to four  SJA1000) -----------------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCI \
+	-DCAN_PORT_IO   \
+	-DCAN_MAX_OPEN=4 \
+	-DCAN_SYSCLK=8 	\
+	-DCANFD \
+	#-DIODEBUG
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "JANZ_PCIL"
+# JANZ AG CAN-PCIL PeliCAN  up to 2 CAN channels ------------------------------
+# CAN_MAX_CHANNELS=4   means up to 4 boards one channel each, or two board
+# http://www.ems-wuensche.com
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCI \
+	-DCAN_MAX_CHANNELS=4 -DCAN_MAX_OPEN=4 -DCAN_SYSCLK=8 \
+	-DCANFD \
+
+	#-DIODEBUG
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "MMC_SJA1000"
+# Weidmüller MMC 
+# using adress/data multiplexed SJA1000  PeliCAN ISA
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_INDEXED_MEM_IO \
+	-DCAN_SYSCLK=5 \
+	-DMAX_CHANNELS=3 -DCAN_MAX_OPEN=2\
+		-Wno-undef
+	#-DCONFIG_TIME_MEASURE=1
+TARGET_MATCHED = true
+endif
+
+
+ifeq "$(TARGET)" "CC_CANPCI"
+
+#CAN_MODULE_POSTFIX = _cc
+#CAN_MODULE := $(CAN_MODULE)$(CAN_MODULE_POSTFIX)
+#CAN_MAJOR  =	92
+
+# Contemporary Controls
+# CC PCI PeliCAN  PCI (only with SJA1000) ------------------------------------
+# CANPCI-CO and CANPCI-DN
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCI \
+	-DCAN_PORT_IO   \
+	-DCAN_SYSCLK=8	\
+ 	-DMAX_CHANNELS=1 -DCAN_MAX_OPEN=4\
+	-DCAN_MODULE_POSTFIX=\"$(CAN_MODULE_POSTFIX)\"
+	# -DCANFD \
+
+	#-DIODEBUG
+
+TARGET_MATCHED = true
+endif
+
+# port GmbH AT-CAN-MINI
+# Arcom AIM104-CAN
+# Janus-MM Dual CAN in io-address mode
+ifeq "$(TARGET)" "ATCANMINI_PELICAN"
+# AT-CAN-MINI PeliCAN ISA (only with SJA1000) --------------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_PORT_IO \
+	-DCAN_SYSCLK=8 \
+	-DCAN_MAX_OPEN=4 
+	#-DCONFIG_M586
+	#-DCONFIG_TIME_MEASURE=1
+
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "CPC_CARD"
+# CPC-Card PeliCAN  PC-Card  (only with SJA1000) -----------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR)\
+	-DCAN4LINUX_PCCARD \
+	-DCAN_SYSCLK=8
+
+	#-DIODEBUG
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "IXXAT_PCI03"
+# IXXAT PC-I 03 board ISA (only with SJA1000) ---------------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8
+
+	ISA = TRUE
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "PCM3680"
+# Advantech PCM3680 PC104 board 2xCAN (only with SJA1000) --------------------
+# http://www.advantech.gr/epc/products/pcm3680.htm
+# http://www.emacinc.com/Archive/pcm3680.pdf 
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8
+
+	ISA = TRUE
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "PCM9890"
+# http://www.bsky.com.cn/
+# BSKY PCM9890  PC104 board using SJA1000 -------------------------------
+# PC/104 CAN bus communication card with DIO function
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCan_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8 \
+	-DMAX_CHANNELS=1 \
+	-DCAN_MAX_OPEN=4
+	
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "CPC104"
+# EMS Wünsche CPC-104 PC104 board 1xCAN (only with SJA1000) -------------------
+# should work for the ISA series CPC-XT as well (not tested yet)
+# http://www.ems-wuensche.com
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8 \
+	-DPC104_OPTION_ROM
+
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "TRM816"
+# TRM816 Onboard CAN-Controller (only with SJA1000) --------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_INDEXED_PORT_IO \
+	-DCAN_SYSCLK=10
+	-DMAX_CHANNELS=2
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "CPC104_200"
+# ESD PC104-200 PC104 board (with SJA1000) ----------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_PORT_IO -DPC104 \
+	-DCAN_SYSCLK=8
+
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "IME_SLIMLINE"
+# I+ME  PcSlimline ISA (only with SJA1000) -----------------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8
+
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "CTI_CANPRO"
+# Connect Tech CANPro PC104 board (SJA1000) ----------------------------
+# http://www.connecttech.com
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+       -DCAN_PORT_IO \
+       -DPC104 \
+       -DCTICANPRO \
+       -DCAN_SYSCLK=8
+
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+
+ifeq "$(TARGET)" "GENERIC_I82527"
+# Generic i82527 card
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8 -DCAN_PORT_IO
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "SBS_PC7"
+# SBS PC7compact DINrail mounted Industry PC (with i82527)
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8 -DCAN_PORT_IO
+
+TARGET_MATCHED = true
+endif
+
+# Analog Devices BF537 STAMP board
+ifeq "$(TARGET)" "AD_BLACKFIN"
+# integrated CAN of the Analog Devices BlackFin DSP
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=125 \
+	-DMAX_CHANNELS=1 \
+	#-DCONFIG_TIME_MEASURE=1
+
+TARGET_MATCHED = true
+endif
+
+
+
+# ATMEL AT91SAM9263-EX Board (Y4 50 Mhz)
+# 
+ifeq "$(TARGET)" "ATMEL_SAM9"
+# integrated CAN of the ATMEL AT91SAM9263
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=100 \
+	-DMAX_CHANNELS=1 \
+	-DCAN_MAX_OPEN=2 \
+	#-DCONFIG_TIME_MEASURE=1
+
+TARGET_MATCHED = true
+endif
+
+# SSV ATMEL AT91SAM9263 Board  using MCP2515 via SPI
+# 
+ifeq "$(TARGET)" "SSV_MCP2515"
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=16 \
+	-DMAX_CHANNELS=1 \
+	#-DCONFIG_TIME_MEASURE=1
+
+#KDIR=/home/oertel/pakete/linux-2.6.24.7
+#CC=/usr/local/angstrom/arm/bin/arm-angstrom-linux-gnueabi-gcc -v
+#CFLAGS=
+#DEFS=
+TARGET_MATCHED = true
+endif
+
+# Raspberry using MCP2515 via SPI
+# using the kernel SPI driver
+# 
+ifeq "$(TARGET)" "RASPI"
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DMCP2515SPI \
+	-DCAN_SYSCLK=16 \
+	-DMAX_CHANNELS=1 \
+	#-DCONFIG_TIME_MEASURE=1
+
+#KDIR=/home/oertel/pakete/linux-2.6.24.7
+#CC=/usr/local/angstrom/arm/bin/arm-angstrom-linux-gnueabi-gcc -v
+#CFLAGS=
+#DEFS=
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "VCMA9"
+# external SJA1000
+DEFS =  -D$(TARGET) -D$(DEBUG) -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=12 \
+	-DMAX_CHANNELS=1 \
+	-DMAX_BUFSIZE=512
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "CPC_PCM_104"
+# This is a special Target Supporting two different PC104 boards
+# CPC-104 by EMS Wï¿½nsche at addresses in the range 0xD0000 to 0xD7FFF
+# PCM3680 by Advantech in the range from 0xd8000 to 0xDFFFF
+# -----------------------------------------------------------------------------
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+	-DCAN_SYSCLK=8 \
+	-DPC104_OPTION_ROM
+
+	ISA = TRUE
+
+TARGET_MATCHED = true
+endif
+
+ifeq "$(TARGET)" "ECAN1000"
+# RTD ECAN1000 PC104 board (only with SJA1000) --------------------
+# http://www.rtd.com
+DEFS =  -D$(TARGET) -D$(DEBUG) -DDEFAULT_DEBUG -DCAN_MAJOR=$(CAN_MAJOR) \
+    -DCAN_INDEXED_PORT_IO \
+    -DPC104 \
+	-DCAN_SYSCLK=8 \
+
+	ISA = TRUE
+TARGET_MATCHED = true
+endif
+
+###########################################################################
+#ifneq "$(TARGET_MATCHED)" "true"
+#.DEFAULT: all ; @$(MAKE) all
+#all:	
+	#@echo "You didn't select a supported TARGET"
+	#@echo "select one of: ATCANMINI_PELICAN, CPC_PCI, CPC_CARD, IME_SLIMLINE, IXXAT_PCI03,"
+	#@echo " PCM3680, PCM9890, CPC104_200, TRM816, SBS_PC7, JANZ_PCIL"
+#endif
+
+# general compiler switches
+DEFS += -Wno-undef
+
+
+ifneq ($(KERNELRELEASE),)
+
+EXTRA_CFLAGS  = $(DEFS) -DVERSION=\"$(DVERSION)_$(TARGET)\ $(SVNVERSION)\"
+
+obj-m		:= $(CAN_MODULE).o
+# add other object modules here
+$(CAN_MODULE)-objs:=  core.o		\
+	    open.o		\
+	    read.o		\
+	    write.o		\
+	    ioctl.o		\
+	    select.o	\
+	    debug.o		\
+	    util.o		\
+	    sysctl.o	\
+	    async.o		\
+	    close.o		\
+
+	    # include Chip/board specific object files and definitions
+	    ##########################################################
+	    # PCI
+	    ifeq "$(TARGET)" "CPC_PCI"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += ems_pci.o
+	    endif
+	    ifeq "$(TARGET)" "CPC_PCI2"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += ems_pci2.o
+	    endif
+	    ifeq "$(TARGET)" "JANZ_PCIL"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += janz_pcil.o
+	    endif
+	    ifeq "$(TARGET)" "CC_CANPCI"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += cc_pci.o
+	    endif
+	    ifeq "$(TARGET)" "KVASER_PCICAN"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += kvaser_pci.o
+	    endif
+
+	    # ISA
+	    ifeq "$(TARGET)" "ATCANMINI_PELICAN"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)objs += port_atcanmini.o
+	    endif
+	    ifeq "$(TARGET)" "IXXAT_PCI03"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+	    endif
+	    ifeq "$(TARGET)" "PC104_200"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+	    endif
+	    ifeq "$(TARGET)" "IME_SLIMLINE"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+	    endif
+	    # PC 104
+	    ifeq "$(TARGET)" "PCM3680"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += pcm3680.o
+	    endif
+	    ifeq "$(TARGET)" "PCM9890"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += pcm9890.o
+	    endif
+	    ifeq "$(TARGET)" "CPC104"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += cpc_104.o
+	    endif
+	    ifeq "$(TARGET)" "CPC_PCM_104"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += cpc_pcm_104.o
+	    endif
+	    ifeq "$(TARGET)" "CTI_CANPRO"
+                $(CAN_MODULE)-objs += sja1000funcs.o
+                $(CAN_MODULE)-objs += cti_canpro.o
+            endif
+	    ifeq "$(TARGET)" "ECAN1000"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += ecan1000.o
+	    endif
+	    # unknown
+	    ifeq "$(TARGET)" "TRM816"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+	    endif
+	    ifeq "$(TARGET)" "SBS_PC7"
+		$(CAN_MODULE)-objs += i82527funcs.o
+	    endif
+	    ifeq "$(TARGET)" "VCMA9"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += mpl_vcma9.o
+	    endif
+	    # PC Card
+	    ifeq "$(TARGET)" "CPC_CARD"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+	    endif
+ 	    # embedded things starting here
+	    ifeq "$(TARGET)" "RASPI"
+		$(CAN_MODULE)-objs += mcp2515funcs.o
+	    endif
+	    ifeq "$(TARGET)" "SSV_MCP2515"
+		$(CAN_MODULE)-objs += mcp2515funcs.o
+	    endif
+	    ifeq "$(TARGET)" "MMC_SJA1000"
+		$(CAN_MODULE)-objs += sja1000funcs.o
+		$(CAN_MODULE)-objs += mmc.o
+	    endif
+	    ifeq "$(TARGET)" "ColdFire_FlexCAN"
+		$(CAN_MODULE)-objs += mcf5282funcs.o
+	    endif
+	    ifeq "$(TARGET)" "AD_BLACKFIN"
+		$(CAN_MODULE)-objs += bf537funcs.o
+	    endif
+	    ifeq "$(TARGET)" "ATMEL_SAM9"
+		$(CAN_MODULE)-objs += at9263funcs.o
+	    endif
+else
+KDIR 	:= /lib/modules/$(shell uname -r)/build/
+PWD	:= $(shell pwd)
+
+.PHONY: all
+
+ifndef TARGET
+all:
+	@echo "Please specify TARGET= at command line" 
+	@echo "  \"make help\" will help" 
+else
+all:
+	@echo "compile with KDIR=$(KDIR), at $(PWD)"
+	@echo "CC = $(CC)"
+	$(MAKE)	-C $(KDIR) C=0 M=$(PWD) TARGET=$(TARGET) modules
+endif
+endif
+
+
+
+# load host specific driver
+load:
+	@$(ECHO) ">>> " Loading Driver Module to Kernel
+	/sbin/insmod $(CAN_MODULE).ko
+ifeq "$(ISA)" "TRUE"
+	@$(ECHO) "Loading etc/$(CONFIG).conf CAN configuration"
+	    ./utils/cansetup ./etc/$(CONFIG).conf
+endif
+	#echo 7 >/proc/sys/dev/Can/dbgMask
+
+# load version without hardware, internal virtual CAN Bus simulation only
+simload:
+	@$(ECHO) ">>> " Loading Driver Module to Kernel
+	/sbin/insmod $(CAN_MODULE).ko virtual=1
+	echo 7 >/proc/sys/dev/Can/dbgMask
+	chmod 666 /dev/can[0-3]
+
+
+# unload the driver module
+unload:
+	$(ECHO) ">>> " Removing Driver Module from Kernel
+	-/sbin/rmmod $(CAN_MODULE)
+# unload ems_pci 
+unload2:
+	-/sbin/rmmod ems_pci sja1000 can_dev
+	
+
+clean:
+	-rm -f tags
+	-rm -f *.o *.ko
+	-rm -f .*.cmd *.mod.c
+	-rm -rf .tmp_versions
+
+
+# how should be handled a second can4linux driver with a different CAN_MAJOR
+# but using device inode names like /dev/can10, /dev/can11, ... ?
+inodes:
+	-mknod /dev/can0 c $(CAN_MAJOR) 0
+	-mknod /dev/can1 c $(CAN_MAJOR) 1
+	-mknod /dev/can2 c $(CAN_MAJOR) 2
+	-mknod /dev/can3 c $(CAN_MAJOR) 3
+	-mknod /dev/can4 c $(CAN_MAJOR) 4
+	-mknod /dev/can5 c $(CAN_MAJOR) 5
+	-mknod /dev/can6 c $(CAN_MAJOR) 6
+	-mknod /dev/can7 c $(CAN_MAJOR) 7
+	chmod 666 /dev/can[0-7]
+inodes2:
+	-mknod /dev/can10 c $(CAN_MAJOR) 0
+	-mknod /dev/can11 c $(CAN_MAJOR) 1
+	-mknod /dev/can12 c $(CAN_MAJOR) 2
+	-mknod /dev/can13 c $(CAN_MAJOR) 3
+	chmod 666 /dev/can1[0-3]
+
+
+ctags:
+	$(CTAGS)  *.[ch] 
+
+
+.PHONY:ChangeLog
+ChangeLog:
+	svn2cl -i
+		
+#### HTML Manual section. #################################
+.PHONY:man
+man:    
+	doxygen
+
+
+help:
+	@grep "^## " Makefile
+
+# Henrik Maier's special load target
+hm:
+	make TARGET=SBS_PC7
+	-/sbin/rmmod $(CAN_MODULE)
+	/sbin/insmod $(CAN_MODULE).ko
+	# only for ISA
+	./utils/cansetup ./etc/pc7.conf
+	echo 7 >/proc/sys/Can/dbgMask
+
+
+# obsolete, svn on SourceForge used
+.PHONY:cvstag
+cvstag:
+	cvs tag CAN4LINUX-3-5-8
+
+# use ./scripts/checkpatch.pl" from the kernel and fix all coding
+# style errors for patches.
+# Compile code with "make C=1", fix all errors.
+
+checkpatch:
+
+
+.PHONY: splint
+splint:
+	splint -preproc -imptype +posixlib -I. \
+	-DMAX_CHANNELS=2 -DCAN_MAX_OPEN=2 \
+	    core.c	\
+	    open.c	\
+	    read.c	\
+	    write.c	\
+	    ioctl.c	\
+	    select.c	\
+	    debug.c	\
+	    util.c	\
+	    sysctl.c	\
+	    async.c	\
+	    close.c	\
